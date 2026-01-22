@@ -1,0 +1,44 @@
+# Scripts Directory
+
+This directory contains utility scripts for the Dad Circles Onboarding application.
+
+## Admin User Seeding
+
+### seedAdminUser.js
+
+Automatically creates an admin user in Firebase Auth emulator on server start.
+
+**Environment Variables Required:**
+- `PRIMARY_ADMIN_EMAIL` - Email address for the admin user
+- `PRIMARY_ADMIN_PASSWORD` - Password for the admin user
+
+**How it works:**
+1. Reads credentials from `.env` file
+2. Connects to Firebase Auth emulator (localhost:9099)
+3. Creates a new user with display name "admin" if it doesn't exist
+4. Updates the display name to "admin" if the user already exists
+
+**Usage:**
+This script is automatically called by `start-dev.sh` after the Firebase emulators start.
+
+You can also run it manually:
+```bash
+node scripts/seedAdminUser.js
+```
+
+**Configuration:**
+Add these lines to your `.env` file:
+```
+PRIMARY_ADMIN_EMAIL=admin@example.com
+PRIMARY_ADMIN_PASSWORD=your_secure_password_here
+```
+
+If these environment variables are not set, the script will skip seeding and log a warning message.
+
+**Note:** This only creates a Firebase Auth user with display name "admin". Admin users are handled separately from regular user profiles and don't need a Firestore profile entry.
+
+## Other Scripts
+
+- `seedTestUsers.ts` - Seeds test user data for matching algorithm testing
+- `cleanTestUsers.ts` - Removes test user data from the database
+- `readLogs.js` - Utility for reading application logs
