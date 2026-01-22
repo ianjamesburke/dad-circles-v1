@@ -44,3 +44,6 @@ mobile-test.html
 *.sln
 *.sw?
 .firebase/hosting.ZGlzdA.cache
+
+# Testing
+coverage
