@@ -20,7 +20,3 @@ To run this project locally outside of Google AI Studio:
 
 ## 🧪 Testing the Flow
 Use the **Test Persona** buttons at the top of the Chat interface to jump between different stages of the onboarding process to verify the LLM's state management logic.
-
-
-hi
-Howdy
