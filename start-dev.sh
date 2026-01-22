@@ -117,6 +117,11 @@ echo -e "${YELLOW}🔐 Seeding admin user...${NC}"
 node scripts/seedAdminUser.js
 echo ""
 
+# Seed Ian user
+echo -e "${YELLOW}🌱 Seeding user 'Ian'...${NC}"
+npx tsx scripts/seedIan.ts
+echo ""
+
 # Start Vite dev server in background
 echo -e "${GREEN}⚡ Starting Vite dev server...${NC}"
 npm run dev > vite-dev.log 2>&1 &

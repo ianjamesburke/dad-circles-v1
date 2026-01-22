@@ -1,9 +1,11 @@
-import {Resend} from "resend";
+import { Resend } from "resend";
 import * as logger from "firebase-functions/logger";
 
 // Initialize Resend with API key from environment
 // Handle missing API key gracefully for development/testing
 let resend: Resend | null = null;
+const isEmulator = process.env.FUNCTIONS_EMULATOR === "true";
+const sendRealEmails = process.env.SEND_REAL_EMAILS === "true";
 
 try {
   if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== "your_resend_api_key_here") {
@@ -22,49 +24,69 @@ export interface EmailTemplate {
   html: string;
   from?: string;
 }
+
 export class EmailService {
   private static readonly DEFAULT_FROM = "DadCircles <noreply@dadcircles.com>";
 
   /**
    * Send an email using Resend
+   * Handles simulation in development/emulator unless SEND_REAL_EMAILS is true
    */
-  static async sendEmail(template: EmailTemplate): Promise<boolean> {
-    logger.info("📧 EmailService.sendEmail called", {
-      to: template.to,
-      subject: template.subject,
-      from: template.from || this.DEFAULT_FROM,
-      hasResend: !!resend,
-      apiKeyConfigured: !!process.env.RESEND_API_KEY
-    });
+  static async sendEmail(template: EmailTemplate, forceSimulation: boolean = false): Promise<boolean> {
+    const from = template.from || this.DEFAULT_FROM;
 
-    try {
-      // If Resend is not configured, simulate email sending for development
-      if (!resend) {
-        logger.warn("⚠️ SIMULATED EMAIL (Resend not configured)", {
-          to: template.to,
-          subject: template.subject,
-          from: template.from || this.DEFAULT_FROM,
-        });
-        return true; // Return success for development
+    // Determine if we should simulate
+    const shouldSimulate =
+      forceSimulation ||
+      (isEmulator && !sendRealEmails) ||
+      !resend;
+
+    if (shouldSimulate) {
+      const reason = forceSimulation ? "Force Simulation" :
+        (isEmulator && !sendRealEmails) ? "Emulator Mode (Real Emails Disabled)" :
+          "Missing API Key";
+
+      logger.info("📝 SIMULATED EMAIL LOG", {
+        reason,
+        to: template.to,
+        from: from,
+        subject: template.subject,
+        htmlPreview: template.html.substring(0, 100) + "...",
+        fullContent: "Check usage logs for full content if needed"
+      });
+
+      // In emulator, print a visual divider and details to stdout for easy reading
+      if (isEmulator) {
+        console.log("\n" + "=".repeat(50));
+        console.log("📧 SIMULATED EMAIL DISPATCHED");
+        console.log("=".repeat(50));
+        console.log(`To:      ${template.to}`);
+        console.log(`From:    ${from}`);
+        console.log(`Subject: ${template.subject}`);
+        console.log(`Reason:  ${reason}`);
+        console.log("-".repeat(50));
+        console.log("BODY PREVIEW:");
+        console.log(template.html.replace(/<[^>]*>/g, '').substring(0, 300).trim() + "...");
+        console.log("=".repeat(50) + "\n");
       }
 
-      logger.info("🚀 Sending email via Resend API", {
+      return true; // Return success for simulation
+    }
+
+    try {
+      if (!resend) throw new Error("Resend client not initialized");
+
+      logger.info("🚀 Sending REAL email via Resend API", {
         to: template.to,
-        from: template.from || this.DEFAULT_FROM,
+        from: from,
         subject: template.subject
       });
 
       const result = await resend.emails.send({
-        from: template.from || this.DEFAULT_FROM,
+        from: from,
         to: template.to,
         subject: template.subject,
         html: template.html,
-      });
-
-      logger.info("📬 Resend API response received", {
-        hasError: !!result.error,
-        hasData: !!result.data,
-        emailId: result.data?.id
       });
 
       if (result.error) {
@@ -75,7 +97,6 @@ export class EmailService {
       logger.info("✅ Email sent successfully", {
         emailId: result.data?.id,
         to: template.to,
-        subject: template.subject,
       });
 
       return true;
@@ -233,11 +254,11 @@ export class EmailService {
    * Generate group introduction email template
    */
   static generateGroupIntroductionEmail(
-    groupName: string, 
+    groupName: string,
     members: Array<{ name: string; childInfo: string }>,
     testMode: boolean = false
   ): EmailTemplate {
-    const membersList = members.map(member => 
+    const membersList = members.map(member =>
       `<li><strong>${member.name}</strong> - ${member.childInfo}</li>`
     ).join('');
 
@@ -380,35 +401,16 @@ export class EmailService {
             to: member.email
           };
 
-          if (testMode || !resend) {
-            // In test mode or without Resend, just log
-            logger.info("📧 SIMULATED GROUP EMAIL", {
-              to: member.email,
-              groupName,
-              testMode,
-              reason: testMode ? 'test mode' : 'no resend configured'
-            });
+          // Use sendEmail with forceSimulation if testMode is true
+          const success = await this.sendEmail(memberTemplate, testMode);
+
+          if (success) {
             emailedMembers.push(member.email);
           } else {
-            // Send real email
-            logger.info("🚀 Sending real email via Resend", {
+            logger.error("❌ Failed to send group introduction email", {
               to: member.email,
               groupName
             });
-            
-            const success = await this.sendEmail(memberTemplate);
-            if (success) {
-              emailedMembers.push(member.email);
-              logger.info("✅ Group introduction email sent successfully", {
-                to: member.email,
-                groupName
-              });
-            } else {
-              logger.error("❌ Failed to send group introduction email", {
-                to: member.email,
-                groupName
-              });
-            }
           }
         } catch (memberError) {
           logger.error("❌ Error sending group email to individual member", {

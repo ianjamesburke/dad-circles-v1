@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:local": "cross-env VITE_GEMINI_API_KEY=your_api_key_here vite",
+    "dev:full": "./start-dev.sh",
     "dev:server": "node server.js",
     "build": "vite build",
     "preview": "vite preview",
