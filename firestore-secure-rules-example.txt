@@ -1,0 +1,25 @@
+// Example of more secure Firestore rules for your Dad Circles app
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Allow users to read/write their own profile
+    match /profiles/{sessionId} {
+      allow read, write: if true; // For now, allow all since you don't have auth
+    }
+    
+    // Allow users to read/write messages for their session
+    match /messages/{messageId} {
+      allow read, write: if true; // For now, allow all since you don't have auth
+    }
+    
+    // Block access to everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+// Note: This is still not fully secure without user authentication,
+// but it's better than allowing access to everything
