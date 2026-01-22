@@ -8,6 +8,10 @@
  * - Daily matching and email processing
  */
 
+import * as dotEnv from 'dotenv';
+// Load environment variables from root .env file for local development
+dotEnv.config({ path: '../../.env' });
+
 import { setGlobalOptions } from "firebase-functions";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";

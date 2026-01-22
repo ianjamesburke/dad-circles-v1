@@ -11,7 +11,7 @@ Dad Circles Onboarding MVP is a conversational onboarding application built with
 ### Mac/Linux - One Command Start (Recommended)
 ```bash
 # Start everything (emulators + dev server) with automatic cleanup
-./start-dev.sh
+npm run dev:full
 ```
 
 > [!WARNING]
@@ -33,6 +33,9 @@ npm install
 
 # Development server (uses Vite)
 npm run dev
+
+# Full development environment (Emulators + Vite + Seeding) [Equivalent to ./start-dev.sh]
+npm run dev:full
 
 # Development with local Gemini API key (set in command)
 npm run dev:local
