@@ -1,12 +1,6 @@
 # Dad Circles Onboarding MVP (Phase 1)
 
-A high-fidelity conversational onboarding experience built for new and expecting dads. This project uses the **Gemini 2.0 Flash** model to drive a human-like, state-aware onboarding flow.
-
-## 🚀 Key Features
-- **State-Driven Onboarding**: The agent strictly follows a sequence (Welcome -> Status -> Child Info -> Interests -> Location -> Confirmation).
-- **Test Persona System**: Built-in switcher to test different user journeys (New Dad, Expecting Dad, and Completed profiles).
-- **Admin Dashboard**: A real-time monitoring view where admins can see active sessions and manually inject messages into the conversation.
-- **In-Memory Store**: A robust data structure that mimics a SQL database for easy migration later.
+A high-fidelity conversational onboarding experience built for new and expecting dads.
 
 ## 🛠️ Tech Stack
 - **React 19** (via ESM)
