@@ -1,7 +1,6 @@
 import { UserProfile, Message, OnboardingStep } from "../types";
 import { limitMessageContext } from "./contextManager";
 import { contextAnalytics } from "../utils/contextAnalytics";
-import { getLocationFromPostcode } from "../utils/location";
 
 // Enable verbose logging in development
 const isDev = import.meta.env.DEV;
@@ -76,7 +75,7 @@ siblings: Ask "Do you have other kids?" or "Do you have any existing children?" 
   - Only skip if user clearly indicated they have no other children.
   - When user provides sibling info, capture names, birth dates, and add to the children array with type "existing".
 interests: Ask for hobbies/interests once after child info. If user says none, accept and move on. Never probe repeatedly.
-location: Ask for city and state. If user provides only city, infer US state, confirm with user. Do not include "(USA only)" — assume all locations are in the USA.
+location: If location data exists in profile (e.g. inferred from zip), verify it with the user (e.g. "I see you're in [City], [State]. Is that right?"). If they confirm, move to next step. If they deny or if location is missing, ask for city and state. Do not include "(USA only)" — assume all locations are in the USA.
 confirm: Present a full summary of all collected information in a clean, readable format.
 
 CONFIRMATION FORMAT EXAMPLE:
@@ -177,23 +176,7 @@ export const getAgentResponse = async (profile: UserProfile, history: Message[])
   // Choose the appropriate system prompt
   const systemPrompt = isFAQMode ? FAQ_SYSTEM_PROMPT : SYSTEM_PROMPT;
   
-  // Fetch location from postcode if available
-  let locationHint = "";
-  if (!isFAQMode && profile.postcode && !profile.location && 
-      (profile.onboarding_step === OnboardingStep.INTERESTS || profile.onboarding_step === OnboardingStep.LOCATION)) {
-    try {
-      if (isDev) console.log(`🤖 [AI Service] Fetching location for postcode: ${profile.postcode}`);
-      const locationInfo = await getLocationFromPostcode(profile.postcode);
-      if (locationInfo) {
-        if (isDev) console.log(`🤖 [AI Service] Found location: ${locationInfo.city}, ${locationInfo.stateCode}`);
-        locationHint = `\n\nLOCATION HINT: The user's postcode ${profile.postcode} corresponds to ${locationInfo.city}, ${locationInfo.stateCode}. Verify this with the user during the 'location' step instead of asking for city/state from scratch. Example: "I see from your zip code you're in ${locationInfo.city}, ${locationInfo.stateCode}. Is that right?" If the user confirms, capture this location.`;
-      }
-    } catch (e) {
-      console.error('Error fetching location hint:', e);
-    }
-  }
-  
-  const fullPrompt = `${systemPrompt}${locationHint}
+  const fullPrompt = `${systemPrompt}
 
 Current Profile State: ${JSON.stringify(profile)}
 Onboarding Step: ${profile.onboarding_step}
