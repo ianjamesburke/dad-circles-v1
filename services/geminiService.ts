@@ -1,6 +1,7 @@
 import { UserProfile, Message, OnboardingStep } from "../types";
 import { limitMessageContext } from "./contextManager";
 import { contextAnalytics } from "../utils/contextAnalytics";
+import { getLocationFromPostcode } from "../utils/location";
 
 // Enable verbose logging in development
 const isDev = import.meta.env.DEV;
@@ -176,7 +177,23 @@ export const getAgentResponse = async (profile: UserProfile, history: Message[])
   // Choose the appropriate system prompt
   const systemPrompt = isFAQMode ? FAQ_SYSTEM_PROMPT : SYSTEM_PROMPT;
   
-  const fullPrompt = `${systemPrompt}
+  // Fetch location from postcode if available
+  let locationHint = "";
+  if (!isFAQMode && profile.postcode && !profile.location && 
+      (profile.onboarding_step === OnboardingStep.INTERESTS || profile.onboarding_step === OnboardingStep.LOCATION)) {
+    try {
+      if (isDev) console.log(`🤖 [AI Service] Fetching location for postcode: ${profile.postcode}`);
+      const locationInfo = await getLocationFromPostcode(profile.postcode);
+      if (locationInfo) {
+        if (isDev) console.log(`🤖 [AI Service] Found location: ${locationInfo.city}, ${locationInfo.stateCode}`);
+        locationHint = `\n\nLOCATION HINT: The user's postcode ${profile.postcode} corresponds to ${locationInfo.city}, ${locationInfo.stateCode}. Verify this with the user during the 'location' step instead of asking for city/state from scratch. Example: "I see from your zip code you're in ${locationInfo.city}, ${locationInfo.stateCode}. Is that right?" If the user confirms, capture this location.`;
+      }
+    } catch (e) {
+      console.error('Error fetching location hint:', e);
+    }
+  }
+  
+  const fullPrompt = `${systemPrompt}${locationHint}
 
 Current Profile State: ${JSON.stringify(profile)}
 Onboarding Step: ${profile.onboarding_step}
