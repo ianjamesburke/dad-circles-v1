@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { database } from '../database';
+import { getLocationFromPostcode } from '../utils/location';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -67,6 +68,23 @@ const LandingPage: React.FC = () => {
       if (!signupForOther && sessionId) {
         // Create initial profile with email and postcode
         await database.createProfile(sessionId, email, postcode);
+
+        // Fetch and store location data immediately so it's available for the onboarding agent
+        // This avoids making API calls during the conversation
+        try {
+          const locationInfo = await getLocationFromPostcode(postcode);
+          if (locationInfo) {
+            await database.updateProfile(sessionId, {
+              location: {
+                city: locationInfo.city,
+                state_code: locationInfo.stateCode
+              }
+            });
+          }
+        } catch (error) {
+          console.error('Error pre-fetching location:', error);
+          // Continue anyway - the agent will ask for location if missing
+        }
       }
 
       // 6. Handle navigation or success message
