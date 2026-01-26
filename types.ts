@@ -101,12 +101,6 @@ export interface MatchingStats {
   total_users: number;
   matched_users: number;
   unmatched_users: number;
-  by_location: Record<string, {
-    total: number;
-    matched: number;
-    unmatched: number;
-    by_life_stage: Record<LifeStage, number>;
-  }>;
 }
 
 export interface MatchingResult {

@@ -12,6 +12,11 @@ export const AdminUserDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [adminInput, setAdminInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [sendingAbandonmentEmail, setSendingAbandonmentEmail] = useState(false);
+  const [abandonmentEmailStatus, setAbandonmentEmailStatus] = useState<{
+    message: string;
+    type: 'success' | 'error';
+  } | null>(null);
 
   const loadData = async () => {
     if (!userId) return;
@@ -56,6 +61,27 @@ export const AdminUserDetail: React.FC = () => {
       console.error('Error sending message:', error);
     }
     setSending(false);
+  };
+
+  const handleSendAbandonmentEmail = async () => {
+    if (!userId || sendingAbandonmentEmail) return;
+
+    setSendingAbandonmentEmail(true);
+    setAbandonmentEmailStatus(null);
+    try {
+      const result = await database.sendManualAbandonmentEmail(userId);
+      if (result.success) {
+        setAbandonmentEmailStatus({ message: result.message || 'Email sent successfully!', type: 'success' });
+        // Re-load data to show updated profile (e.g., abandonment_sent flag)
+        await loadData();
+      } else {
+        setAbandonmentEmailStatus({ message: result.message || 'Failed to send email.', type: 'error' });
+      }
+    } catch (error: any) {
+      console.error('Error sending abandonment email:', error);
+      setAbandonmentEmailStatus({ message: error.message || 'An unknown error occurred.', type: 'error' });
+    }
+    setSendingAbandonmentEmail(false);
   };
 
   if (loading) {
@@ -136,6 +162,33 @@ export const AdminUserDetail: React.FC = () => {
                 <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Last Updated</p>
                 <p className="text-white">{new Date(profile.last_updated).toLocaleString()}</p>
               </div>
+            </div>
+          </div>
+
+          {/* Admin Actions */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h3 className="text-white font-medium mb-4">Admin Actions</h3>
+            <div className="space-y-4">
+              <button
+                onClick={handleSendAbandonmentEmail}
+                disabled={profile.onboarded || sendingAbandonmentEmail}
+                className="w-full bg-sky-600 hover:bg-sky-700 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg font-medium transition flex items-center justify-center gap-2"
+              >
+                <i className="fas fa-envelope"></i>
+                {sendingAbandonmentEmail ? 'Sending...' : 'Send Abandonment Email'}
+              </button>
+              {abandonmentEmailStatus && (
+                <div className={`text-sm text-center p-2 rounded-lg ${
+                  abandonmentEmailStatus.type === 'success' 
+                    ? 'bg-green-500/10 text-green-400' 
+                    : 'bg-red-500/10 text-red-400'
+                }`}>
+                  {abandonmentEmailStatus.message}
+                </div>
+              )}
+              {profile.onboarded && (
+                <p className="text-xs text-slate-500 text-center">User has completed onboarding.</p>
+              )}
             </div>
           </div>
 

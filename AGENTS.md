@@ -2,6 +2,9 @@
 
 This file provides guidance to Coding Agents for working with code in this repository.
 
+> [!CAUTION]
+> **CRITICAL SECURITY RULE**: NEVER commit API keys, secrets, or `.env` files to the repository. Always use `.env.example` as a template and ensure `.env` is in `.gitignore`.
+
 ## Overview
 
 Dad Circles Onboarding MVP is a conversational onboarding application built with React and Gemini 2.0 Flash LLM. The application guides new and expecting dads through a structured onboarding flow while collecting relevant user information (status, children, interests, location). The backend uses Firebase (Firestore for data, Cloud Functions for email), and the frontend is a Vite-powered React app with a test persona system and admin monitoring dashboard.
@@ -21,7 +24,7 @@ This script will:
 - Install dependencies if needed
 - Check for .env file
 - Clean up any existing processes
-- Start Firebase emulators (Firestore)
+- Start Firebase emulators (Firestore, Functions, Auth)
 - Start Vite dev server
 - Show all service URLs
 - Handle cleanup on Ctrl+C
@@ -55,7 +58,7 @@ npm run deploy
 # Deploy only hosting
 npm run deploy:hosting
 
-# Start Firebase emulators (Firestore, Functions, Hosting)
+# Start Firebase emulators (Firestore, Functions, Auth)
 npm run emulator
 
 # Start emulators with data import/export
@@ -67,21 +70,22 @@ npm run emulator:seed
 ### High-Level Data Flow
 
 1. **Frontend (React/Vite)** → User interacts with chat interface or landing page
-2. **Chat API** (`api/chat.ts`) → Processes user messages, manages conversation state
+2. **ChatInterface.tsx** → Processes user messages, manages conversation state
 3. **Gemini Service** (`services/geminiService.ts`) → Calls Google Gemini API with context, manages onboarding step logic
-4. **Database** (`database.ts`) → Firestore operations (profiles, messages, leads)
-5. **Firebase Functions** (`functions/src/`) → Cloud Functions trigger on lead creation or schedule to send emails
-6. **Email Service** → Resend.com API for email delivery
+4. **Database** (`database.ts`) → Firestore operations via Firebase Client SDK (profiles, messages, leads, groups)
+5. **Firebase Callable Functions** (`functions/src/callable.ts`) → Backend logic for matching, emails, magic links
+6. **Email Service** (`functions/src/emailService.ts`) → Resend template-based emails
 
 ### Key Directories
 
-- **`/components`** - React components: ChatInterface, AdminDashboard, LandingPage, Layout, ContextTestPanel
-- **`/api`** - Request/response interfaces and handlers (chat.ts, leads.ts)
-- **`/services`** - Core business logic: Gemini API integration, context management
-- **`/utils`** - Utilities: analytics, helper functions
+- **`/components`** - React components: ChatInterface, LandingPage, Layout, ContextTestPanel
+- **`/components/admin`** - Modular admin dashboard: AdminLayout, AdminUsers, AdminGroups, AdminLeads, AdminOverview, AdminTools
+- **`/services`** - Core business logic: Gemini API integration, context management, matching
+- **`/utils`** - Utilities: analytics, location helpers, logger
 - **`/config`** - Configuration files (e.g., contextConfig.ts for context window management)
-- **`/functions`** - Firebase Cloud Functions (email service, scheduled tasks)
-- **`/functions/src`** - TypeScript source for Cloud Functions
+- **`/functions`** - Firebase Cloud Functions
+- **`/functions/src`** - TypeScript source: callable.ts (backend functions), emailService.ts, matching.ts, logger.ts
+- **`/tests`** - Vitest test suite with factories for test data generation
 
 ### Data Model
 
@@ -146,6 +150,29 @@ npm run emulator:seed
 >    - This is the preferred approach for consistency
 >    - Only use `FieldValue.serverTimestamp()` if you have a specific reason (e.g., preventing client time manipulation)
 
+### Logging Best Practices
+
+When working with Cloud Functions (`functions/src/`), use the custom logger wrapper in `./logger.ts` instead of importing directly from `firebase-functions/logger`.
+
+1. **Why Use the Wrapper?**:
+   - **Pretty Printing**: Automatically detects the Firebase Emulator and formats JSON objects with indentation and colors.
+   - **Production Safety**: Falls back to standard structured logging in production for Google Cloud Logging compatibility.
+   - **Unified Interface**: Supports `info`, `warn`, `error`, `debug`, and `write`.
+
+2. **How to Use**:
+   ```typescript
+   import { logger } from './logger';
+
+   // Simple message
+   logger.info("Function triggered");
+
+   // Message with metadata (will be pretty-printed in emulator)
+   logger.info("Lead processed", { leadId: "123", status: "success" });
+   ```
+
+3. **DebugLogger**:
+   The `DebugLogger` class in the same file also writes logs to a local `debug.log` file in the `functions` directory, which is useful for persistent debugging during complex flows.
+
 ## Key Architectural Patterns
 
 ### Onboarding State Machine
@@ -165,16 +192,36 @@ Context management is critical for cost and quality. The `services/contextManage
 This prevents overwhelming the Gemini API with unnecessary history while maintaining conversation state.
 
 ### Firebase Emulator for Development
-The app supports Firebase Firestore emulator for local development. The emulator can be started with `npm run emulator`. Connection is configured in `firebase.js` but currently commented out (disabled while testing email functionality).
+The app supports Firebase emulators for local development (Firestore, Functions, Auth). The emulator can be started with `npm run emulator` or `npm run dev:full` for the complete development environment. Connection is configured in `firebase.ts` and automatically detects when running in emulator mode.
 
 ### Cloud Functions and Email
-Firebase Cloud Functions (in `functions/`) trigger on:
-1. **Document creation** - When a lead signs up, `sendWelcomeEmail` fires automatically
-2. **Scheduled jobs** - Follow-up emails run on a schedule to nurture inactive leads
 
-The `EmailService` class (`functions/src/emailService.ts`) abstracts Resend.com API calls.
+The email system uses Resend template aliases for all emails. See `EMAIL_MIGRATION_PLAN.md` for complete flow documentation.
+
+**Callable Functions** (`functions/src/callable.ts`):
+- `sendMagicLink` - Sends secure magic link to resume abandoned sessions (duplicate email detection)
+- `sendCompletionEmail` - Sends welcome email when user completes onboarding
+- `runMatching` - Executes matching algorithm to form groups
+- `approveGroup` - Approves pending group and sends intro emails to members
+- `deleteGroup` - Deletes group and unmatches members
+
+**Scheduled Functions** (`functions/src/index.ts`):
+- `sendAbandonmentEmails` - Hourly (8am-8pm ET) recovery emails for incomplete profiles
+
+**Email Templates** (Resend):
+- `welcome-completed` - Sent on onboarding completion
+- `welcome-abandoned` - Sent 1+ hours after abandonment
+- `resume-session` - Sent for duplicate signups or manual magic links
+- `signup-other` - Sent when user signs up for someone else
+- `followup-3day` - Nurture emails for inactive leads
+- `group-intro` - Sent when group is approved
+
+The `EmailService` class (`functions/src/emailService.ts`) handles Resend API calls with automatic simulation in emulator mode (unless `SEND_REAL_EMAILS=true`).
 
 ## Environment Variables
+
+> [!CAUTION]
+> **NEVER commit your actual `.env` file or any API keys to version control.**
 
 Create a `.env` file in the root with:
 
@@ -213,14 +260,27 @@ The system can capture multiple children in a single conversation. The prompt in
 The `ContextTestPanel.tsx` provides buttons to jump between different onboarding states for testing. This doesn't reset the actual user profile but simulates different conversation contexts.
 
 ### Admin Dashboard
-The `AdminDashboard.tsx` shows:
-- List of active sessions with their current onboarding step
-- Real-time monitoring capability
-- Manual message injection for testing
+
+The admin dashboard is a modular multi-page application with authentication:
+
+**Components** (`components/admin/`):
+- `AdminLayout.tsx` - Navigation wrapper with tabs
+- `AdminOverview.tsx` - Stats and system health
+- `AdminUsers.tsx` - List of all user profiles with filtering
+- `AdminUserDetail.tsx` - Detailed view of individual user
+- `AdminGroups.tsx` - Pending and active group management
+- `AdminGroupDetail.tsx` - Detailed group view with member info
+- `AdminLeads.tsx` - Lead management and email tracking
+- `AdminTools.tsx` - Developer tools and utilities
+
+**Features**:
+- Authentication via `AdminLogin.tsx` and `ProtectedAdminDashboard.tsx`
+- Real-time Firestore data monitoring
+- Manual message injection for testing conversations
 - **Matching & Group Approval**:
   - Run matching algorithm to form pending groups
   - Review pending groups and member details
-  - Approve groups (triggers email sending)
+  - Approve groups (triggers email sending via callable function)
   - Delete groups (unmatches members)
 
 ### Matching & Group Formation
@@ -276,15 +336,6 @@ The project uses **Vitest** for unit testing with the following setup:
 ```bash
 # Run all tests once
 npm test
-
-# Run tests in watch mode (for TDD)
-npm run test:watch
-
-# Run tests with coverage report
-npm run test:coverage
-
-# Run tests with UI (interactive)
-npm run test:ui
 ```
 
 ### Test Structure
@@ -387,15 +438,6 @@ For TDD workflow:
 4. Refactor
 5. Repeat
 
-## Testing Considerations
-
-- **Unit tests**: Configured with Vitest. Run `npm test` for all tests, `npm run test:watch` for TDD.
-- **Test factories**: Use `tests/factories/index.ts` for creating consistent test data.
-- **Integration testing**: Use test persona system in chat interface to test different onboarding paths.
-- **Email testing**: Manual-test.ts in functions demonstrates how to test email service without triggering live sends.
-- **Emulator**: Use Firebase Emulator UI to inspect Firestore data during development.
-- **Coverage**: Run `npm run test:coverage` to see coverage report.
-
 ## Code Structure Notes
 
 - **No src/ directory**: Unlike typical React projects, source files are in the root. This is intentional for this MVP.
@@ -419,8 +461,9 @@ For TDD workflow:
 - Check `console.log` output in dev tools
 
 **Firestore emulator not connecting**
-- Uncomment connection code in `firebase.js` (currently disabled)
-- Ensure `firebase emulators:start` is running on port 8083
+- Check that emulators are running: `npm run emulator` or `npm run dev:full`
+- Ensure Firestore emulator is running on port 8083
+- Verify `firebase.ts` has correct emulator configuration
 
 **Messages not persisting**
 - If using emulator, ensure data export is configured: `npm run emulator:seed`
@@ -436,3 +479,19 @@ For TDD workflow:
 - Check log files: `firebase-emulator.log` and `vite-dev.log`
 - If ports are in use, kill existing processes: `pkill -f "firebase emulators"`
 - Ensure Firebase CLI is installed: `npm install -g firebase-tools`
+
+**"Cannot read properties of undefined (reading 'serverTimestamp')"**
+- This occurs when using `admin.firestore.FieldValue.serverTimestamp()`
+- **Fix**: Update import to `import { FieldValue } from 'firebase-admin/firestore'` and use `FieldValue.serverTimestamp()`
+- See "Firebase Admin SDK Timestamp Best Practices" section above
+
+
+
+
+
+
+# General coding guidlines
+
+Do not create commits and push unless explicitly asked. 
+
+

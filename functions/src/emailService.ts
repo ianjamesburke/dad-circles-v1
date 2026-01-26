@@ -1,22 +1,9 @@
 import { Resend } from "resend";
-import * as logger from "firebase-functions/logger";
+import { logger } from "./logger";
 
 // Initialize Resend with API key from environment
 // Handle missing API key gracefully for development/testing
 let resend: Resend | null = null;
-const isEmulator = process.env.FUNCTIONS_EMULATOR === "true";
-const sendRealEmails = process.env.SEND_REAL_EMAILS === "true";
-
-try {
-  if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== "your_resend_api_key_here") {
-    resend = new Resend(process.env.RESEND_API_KEY);
-    logger.info("🔑 Resend initialized successfully with API key");
-  } else {
-    logger.warn("⚠️ RESEND_API_KEY not configured - email sending will be simulated");
-  }
-} catch (error) {
-  logger.error("❌ Failed to initialize Resend:", error);
-}
 
 export interface EmailTemplate {
   to: string;
@@ -25,8 +12,48 @@ export interface EmailTemplate {
   from?: string;
 }
 
+export interface TemplateEmail {
+  to: string;
+  templateId: string;
+  variables: Record<string, string | number>;
+  from?: string;
+}
+
+export const EMAIL_TEMPLATES = {
+  WELCOME_COMPLETED: 'welcome-completed',
+  WELCOME_ABANDONED: 'welcome-abandoned',
+  RESUME_SESSION: 'resume-session',
+  SIGNUP_OTHER: 'signup-other',
+  FOLLOWUP_3DAY: 'followup-3day',
+  GROUP_INTRO: 'group-intro',
+} as const;
+
 export class EmailService {
-  private static readonly DEFAULT_FROM = "DadCircles <noreply@dadcircles.com>";
+  private static readonly DEFAULT_FROM = "Circle <circle@mail.dadcircles.com>";
+  
+  /**
+   * Initialize Resend client lazily
+   */
+  private static initResend(): Resend | null {
+    if (resend) return resend;
+    
+    try {
+      if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== "your_resend_api_key_here") {
+        resend = new Resend(process.env.RESEND_API_KEY);
+        logger.info("🔑 Resend initialized successfully with API key");
+      } else {
+        // Only warn once
+        if (!process.env.SILENCE_RESEND_WARNING) {
+          logger.warn("⚠️ RESEND_API_KEY not configured - email sending will be simulated");
+          process.env.SILENCE_RESEND_WARNING = "true";
+        }
+      }
+    } catch (error) {
+      logger.error("❌ Failed to initialize Resend:", error);
+    }
+    
+    return resend;
+  }
 
   /**
    * Send an email using Resend
@@ -34,6 +61,10 @@ export class EmailService {
    */
   static async sendEmail(template: EmailTemplate, forceSimulation: boolean = false): Promise<boolean> {
     const from = template.from || this.DEFAULT_FROM;
+    this.initResend();
+
+    const isEmulator = process.env.FUNCTIONS_EMULATOR === "true";
+    const sendRealEmails = process.env.SEND_REAL_EMAILS === "true";
 
     // Determine if we should simulate
     const shouldSimulate =
@@ -107,243 +138,77 @@ export class EmailService {
   }
 
   /**
-   * Generate welcome email template
+   * Send a template email using Resend
+   * Handles simulation in development/emulator unless SEND_REAL_EMAILS is true
    */
-  static generateWelcomeEmail(email: string, postcode: string): EmailTemplate {
-    return {
-      to: email,
-      subject: "Welcome to DadCircles! 🎉",
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Welcome to DadCircles</title>
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f8fafc; }
-            .container { max-width: 600px; margin: 0 auto; background-color: white; }
-            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 20px; text-align: center; }
-            .logo { width: 60px; height: 60px; background: rgba(255,255,255,0.2); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 24px; margin-bottom: 20px; }
-            .header h1 { color: white; margin: 0; font-size: 28px; font-weight: 600; }
-            .content { padding: 40px 20px; }
-            .content h2 { color: #1a1a1a; margin-bottom: 20px; }
-            .content p { color: #4a5568; line-height: 1.6; margin-bottom: 20px; }
-            .highlight { background: #f0fdf4; border-left: 4px solid #10b981; padding: 16px; margin: 20px 0; border-radius: 4px; }
-            .footer { background: #f8fafc; padding: 20px; text-align: center; color: #718096; font-size: 14px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <div class="logo">DC</div>
-              <h1>Welcome to DadCircles!</h1>
-            </div>
-            
-            <div class="content">
-              <h2>Thanks for joining our waitlist! 🎉</h2>
-              
-              <p>Hey there!</p>
-              
-              <p>We're excited to have you join the DadCircles community. You've just taken the first step toward connecting with other dads in your area who share your interests and experiences.</p>
-              
-              <div class="highlight">
-                <strong>What happens next?</strong><br>
-                We're building something special for dads in <strong>${postcode}</strong>. We'll be in touch soon with updates about local dad groups and activities in your area.
-              </div>
-              
-              <p>In the meantime, we're working hard to:</p>
-              <ul>
-                <li>Find other dads near you</li>
-                <li>Match you with people who share your interests</li>
-                <li>Set up local meetups and activities</li>
-                <li>Build a supportive community for modern fathers</li>
-              </ul>
-              
-              <p>Keep an eye on your inbox - we'll have more exciting updates coming your way soon!</p>
-              
-              <p>Thanks for being part of the journey.</p>
-              
-              <p><strong>The DadCircles Team</strong></p>
-            </div>
-            
-            <div class="footer">
-              <p>DadCircles is in early alpha - we're building something amazing for dads everywhere.</p>
-              <p>Questions? Just reply to this email - we'd love to hear from you!</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `,
-    };
+  static async sendTemplateEmail(
+    template: TemplateEmail,
+    forceSimulation: boolean = false
+  ): Promise<boolean> {
+    const from = template.from || this.DEFAULT_FROM;
+    this.initResend();
+
+    const isEmulator = process.env.FUNCTIONS_EMULATOR === "true";
+    const sendRealEmails = process.env.SEND_REAL_EMAILS === "true";
+
+    // Determine if we should simulate
+    const shouldSimulate =
+      forceSimulation ||
+      (isEmulator && !sendRealEmails) ||
+      !resend;
+
+    if (shouldSimulate) {
+      // Enhanced simulation logging for templates
+      console.log("\n" + "=".repeat(50));
+      console.log("📧 SIMULATED TEMPLATE EMAIL");
+      console.log("=".repeat(50));
+      console.log(`To:       ${template.to}`);
+      console.log(`From:     ${from}`);
+      console.log(`Template: ${template.templateId}`);
+      console.log(`Variables:`, template.variables);
+      console.log("=".repeat(50) + "\n");
+
+      return true;
+    }
+
+    try {
+      if (!resend) throw new Error("Resend client not initialized");
+
+      // Send using Resend API with template ID (alias)
+      const result = await resend.emails.send({
+        from: from,
+        to: template.to,
+        // Using 'any' cast here because the installed @types/resend might not fully support the 'template' property yet
+        // even though the underlying library does, or to bypass strict type checking if definitions are lagging.
+        // However, based on our investigation, it should be supported.
+        // We omit 'subject' and 'html' as they are defined in the template.
+        template: {
+            id: template.templateId,
+            variables: template.variables
+        }
+      } as any);
+
+      if (result.error) {
+        logger.error("❌ Resend template API error:", result.error);
+        return false;
+      }
+
+      logger.info("✅ Template email sent successfully", {
+        emailId: result.data?.id,
+        to: template.to,
+        templateId: template.templateId,
+      });
+
+      return true;
+    } catch (error) {
+      logger.error("Template email service error:", error);
+      return false;
+    }
   }
 
-  /**
-   * Generate follow-up email template
-   */
-  static generateFollowUpEmail(email: string, postcode: string): EmailTemplate {
-    return {
-      to: email,
-      subject: "Building your local dad network in " + postcode,
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Your DadCircles Update</title>
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f8fafc; }
-            .container { max-width: 600px; margin: 0 auto; background-color: white; }
-            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 20px; text-align: center; }
-            .logo { width: 60px; height: 60px; background: rgba(255,255,255,0.2); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 24px; margin-bottom: 20px; }
-            .header h1 { color: white; margin: 0; font-size: 28px; font-weight: 600; }
-            .content { padding: 40px 20px; }
-            .content h2 { color: #1a1a1a; margin-bottom: 20px; }
-            .content p { color: #4a5568; line-height: 1.6; margin-bottom: 20px; }
-            .highlight { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 16px; margin: 20px 0; border-radius: 4px; }
-            .footer { background: #f8fafc; padding: 20px; text-align: center; color: #718096; font-size: 14px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <div class="logo">DC</div>
-              <h1>Building Your Network</h1>
-            </div>
-            
-            <div class="content">
-              <h2>Progress update from ${postcode} 📍</h2>
-              
-              <p>Hi again!</p>
-              
-              <p>We wanted to give you a quick update on what we're building for dads in your area.</p>
-              
-              <div class="highlight">
-                <strong>What we're working on:</strong><br>
-                We're actively connecting dads in <strong>${postcode}</strong> and surrounding areas. Our goal is to create meaningful connections between fathers who share similar experiences and interests.
-              </div>
-              
-              <p>Here's what's happening behind the scenes:</p>
-              <ul>
-                <li><strong>Community Building:</strong> We're identifying other dads in your area</li>
-                <li><strong>Interest Matching:</strong> Finding people with shared hobbies and parenting styles</li>
-                <li><strong>Local Events:</strong> Planning meetups, playdates, and dad-friendly activities</li>
-                <li><strong>Support Network:</strong> Creating spaces for advice, tips, and friendship</li>
-              </ul>
-              
-              <p>We're getting closer to launching the first local groups. When we're ready, you'll be among the first to know about opportunities to connect with other dads near you.</p>
-              
-              <p>Thanks for your patience as we build something truly valuable for the dad community.</p>
-              
-              <p><strong>The DadCircles Team</strong></p>
-            </div>
-            
-            <div class="footer">
-              <p>Still in early development - but we're making great progress!</p>
-              <p>Have ideas or feedback? Reply to this email - we read every message.</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `,
-    };
-  }
 
-  /**
-   * Generate group introduction email template
-   */
-  static generateGroupIntroductionEmail(
-    groupName: string,
-    members: Array<{ name: string; childInfo: string }>,
-    testMode: boolean = false
-  ): EmailTemplate {
-    const membersList = members.map(member =>
-      `<li><strong>${member.name}</strong> - ${member.childInfo}</li>`
-    ).join('');
 
-    return {
-      to: '', // Will be set per recipient
-      subject: `Meet Your DadCircles Group: ${groupName}${testMode ? ' (TEST)' : ''}`,
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Meet Your DadCircles Group</title>
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f8fafc; }
-            .container { max-width: 600px; margin: 0 auto; background-color: white; }
-            .header { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); padding: 40px 20px; text-align: center; }
-            .logo { width: 60px; height: 60px; background: rgba(255,255,255,0.2); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 24px; margin-bottom: 20px; }
-            .header h1 { color: white; margin: 0; font-size: 28px; font-weight: 600; }
-            .content { padding: 40px 20px; }
-            .content h2 { color: #1a1a1a; margin-bottom: 20px; }
-            .content p { color: #4a5568; line-height: 1.6; margin-bottom: 20px; }
-            .highlight { background: #faf5ff; border-left: 4px solid #8b5cf6; padding: 16px; margin: 20px 0; border-radius: 4px; }
-            .members-list { background: #f8fafc; border-radius: 8px; padding: 20px; margin: 20px 0; }
-            .members-list ul { margin: 0; padding-left: 20px; }
-            .members-list li { margin-bottom: 8px; color: #374151; }
-            .cta { background: #8b5cf6; color: white; padding: 16px 24px; border-radius: 8px; text-align: center; margin: 30px 0; text-decoration: none; display: block; font-weight: bold; }
-            .footer { background: #f8fafc; padding: 20px; text-align: center; color: #718096; font-size: 14px; }
-            ${testMode ? '.test-banner { background: #fef3c7; border: 2px solid #f59e0b; padding: 12px; text-align: center; color: #92400e; font-weight: bold; }' : ''}
-          </style>
-        </head>
-        <body>
-          ${testMode ? '<div class="test-banner">🧪 THIS IS A TEST EMAIL - No real group has been formed</div>' : ''}
-          <div class="container">
-            <div class="header">
-              <div class="logo">DC</div>
-              <h1>Meet Your Group!</h1>
-            </div>
-            
-            <div class="content">
-              <h2>Welcome to ${groupName}! 🎉</h2>
-              
-              <p>Great news! We've matched you with other dads in your area who are at a similar stage in their parenting journey.</p>
-              
-              <div class="highlight">
-                <strong>Your Group Members:</strong><br>
-                You've been matched based on your location and where you are in your parenting journey. Here's who you'll be connecting with:
-              </div>
-              
-              <div class="members-list">
-                <h3 style="margin-top: 0; color: #374151;">Group Members:</h3>
-                <ul>
-                  ${membersList}
-                </ul>
-              </div>
-              
-              <p><strong>What's next?</strong></p>
-              <ul>
-                <li>Reply all to this email to introduce yourself to the group</li>
-                <li>Share a bit about yourself and what you're looking forward to</li>
-                <li>Start planning your first meetup or playdate</li>
-                <li>Exchange contact information if you'd like</li>
-              </ul>
-              
-              <div class="cta">
-                Reply All to Say Hi! 👋
-              </div>
-              
-              <p>We're excited to see the connections you'll make. Remember, this is just the beginning - your group can grow and evolve as you get to know each other.</p>
-              
-              <p>If you have any questions or need support, just reply to this email.</p>
-              
-              <p><strong>The DadCircles Team</strong></p>
-            </div>
-            
-            <div class="footer">
-              <p>DadCircles - Connecting fathers, building community</p>
-              <p>Questions? Just reply to this email - we're here to help!</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `,
-    };
-  }
+
 
   /**
    * Send group introduction email to all members
@@ -353,6 +218,8 @@ export class EmailService {
     members: Array<{ email: string; name: string; childInfo: string }>,
     testMode: boolean = false
   ): Promise<{ success: boolean; emailedMembers: string[] }> {
+    this.initResend();
+    
     logger.info("📧 EmailService.sendGroupIntroductionEmail called", {
       groupName,
       memberCount: members.length,
@@ -373,14 +240,22 @@ export class EmailService {
       }
 
       // Generate the email template
-      const template = this.generateGroupIntroductionEmail(
-        groupName,
-        members.map(m => ({ name: m.name, childInfo: m.childInfo })),
-        testMode
-      );
+      const membersListHtml = members.map(member =>
+        `<li><strong>${member.name}</strong> - ${member.childInfo}</li>`
+      ).join('');
+
+      const template: TemplateEmail = {
+        to: '', // Will be set per recipient
+        templateId: EMAIL_TEMPLATES.GROUP_INTRO,
+        variables: {
+          group_name: groupName,
+          members_list: membersListHtml,
+          test_mode: testMode ? 'true' : 'false'
+        }
+      };
 
       logger.info("✉️ Email template generated successfully", {
-        subject: template.subject,
+        templateId: template.templateId,
         memberCount: members.length
       });
 
@@ -401,8 +276,8 @@ export class EmailService {
             to: member.email
           };
 
-          // Use sendEmail with forceSimulation if testMode is true
-          const success = await this.sendEmail(memberTemplate, testMode);
+          // Use sendTemplateEmail with forceSimulation if testMode is true
+          const success = await this.sendTemplateEmail(memberTemplate, testMode);
 
           if (success) {
             emailedMembers.push(member.email);

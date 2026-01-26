@@ -8,24 +8,26 @@
  * - Daily matching and email processing
  */
 
-import * as dotEnv from 'dotenv';
-// Load environment variables from root .env file for local development
-dotEnv.config({ path: '../../.env' });
-
 import { setGlobalOptions } from "firebase-functions";
+import { defineSecret } from "firebase-functions/params";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
-import * as logger from "firebase-functions/logger";
-import { EmailService } from "./emailService";
-import { DebugLogger } from "./logger";
+import { FieldValue } from "firebase-admin/firestore";
+import { logger, DebugLogger } from "./logger";
+import { EmailService, EMAIL_TEMPLATES } from "./emailService";
+import { getLocationFromPostcode, formatLocation } from "./utils/location";
+import { generateMagicLink } from "./utils/link";
 import { runDailyMatching, sendPendingGroupEmails } from "./matching";
 
-// Import manual test function
-export { manualEmailTest } from "./manual-test";
+// Define secrets - these are automatically loaded from .env in emulator mode
+// and from Cloud Secret Manager in production
+export const resendApiKey = defineSecret("RESEND_API_KEY");
+export const defaultFromEmail = defineSecret("DEFAULT_FROM_EMAIL");
+export const sendRealEmails = defineSecret("SEND_REAL_EMAILS");
 
 // Export Callable Functions for Admin Dashboard
-export { runMatching, seedData, approveGroup, deleteGroup } from "./callable";
+export { runMatching, seedData, approveGroup, deleteGroup, sendMagicLink, sendCompletionEmail, sendManualAbandonmentEmail } from "./callable";
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -44,6 +46,7 @@ export const sendWelcomeEmail = onDocumentCreated(
   {
     document: "leads/{leadId}",
     region: "us-central1",
+    secrets: [resendApiKey, defaultFromEmail, sendRealEmails],
   },
   async (event) => {
     DebugLogger.info("🚀 WELCOME EMAIL FUNCTION TRIGGERED", {
@@ -67,11 +70,12 @@ export const sendWelcomeEmail = onDocumentCreated(
         return;
       }
 
-      const { email, postcode } = leadData;
+      const { email, postcode, signupForOther } = leadData;
 
       DebugLogger.info("🔍 Validating required fields", {
         email: email,
         postcode: postcode,
+        signupForOther: signupForOther,
         hasEmail: !!email,
         hasPostcode: !!postcode
       });
@@ -82,62 +86,42 @@ export const sendWelcomeEmail = onDocumentCreated(
         return;
       }
 
-      DebugLogger.info("📧 Generating welcome email template", {
-        email,
-        postcode
-      });
+      // If signing up for someone else, send immediate email
+      if (signupForOther) {
+        DebugLogger.info("📧 Sending immediate email for 'signup for other'", { email });
+        
+        const locationInfo = await getLocationFromPostcode(postcode);
+        const locationString = locationInfo
+          ? formatLocation(locationInfo.city, locationInfo.stateCode)
+          : postcode;
 
-      logger.info("Sending welcome email", {
-        leadId: event.params.leadId,
-        email,
-        postcode,
-      });
+        const emailTemplate = {
+          to: email,
+          templateId: EMAIL_TEMPLATES.SIGNUP_OTHER,
+          variables: { location: locationString }
+        };
 
-      // Generate and send welcome email
-      const emailTemplate = EmailService.generateWelcomeEmail(email, postcode);
+        const success = await EmailService.sendTemplateEmail(emailTemplate);
 
-      DebugLogger.info("✉️ Email template generated", {
-        to: emailTemplate.to,
-        subject: emailTemplate.subject,
-        from: emailTemplate.from,
-        htmlLength: emailTemplate.html.length
-      });
-
-      // Send email (EmailService handles simulation when API key not configured)
-      DebugLogger.info("🚀 Attempting to send email via EmailService");
-      const success = await EmailService.sendEmail(emailTemplate);
-
-      DebugLogger.info("📬 Email send result", {
-        success: success,
-        email: email,
-        leadId: event.params.leadId
-      });
-
-      if (success) {
-        DebugLogger.info("✅ Email sent/simulated successfully, updating database");
-        // Update the lead document to mark welcome email as sent
-        await event.data?.ref.update({
-          welcomeEmailSent: true,
-          welcomeEmailSentAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-
-        DebugLogger.info("✅ Database updated successfully");
-        logger.info("Welcome email processed successfully", {
-          leadId: event.params.leadId,
-          email,
-        });
+        if (success) {
+          await event.data?.ref.update({
+            signupOtherEmailSent: true,
+            signupOtherEmailSentAt: FieldValue.serverTimestamp(),
+          });
+          logger.info("Signup-other email sent", { leadId: event.params.leadId });
+        } else {
+          logger.error("Failed to send signup-other email", { leadId: event.params.leadId });
+        }
       } else {
-        DebugLogger.error("❌ Email sending failed, marking as failed");
-        logger.error("Failed to send welcome email", {
-          leadId: event.params.leadId,
-          email,
-        });
-
-        // Mark as failed for retry logic
+        // Mark welcome email as pending (sent on completion or abandonment)
+        DebugLogger.info("⏳ Deferring welcome email for personal signup");
+        
         await event.data?.ref.update({
-          welcomeEmailFailed: true,
-          welcomeEmailFailedAt: admin.firestore.FieldValue.serverTimestamp(),
+          welcomeEmailPending: true,
+          welcomeEmailPendingAt: FieldValue.serverTimestamp(),
         });
+        
+        logger.info("Welcome email deferred", { leadId: event.params.leadId });
       }
     } catch (error) {
       logger.error("Welcome email function error:", error);
@@ -157,6 +141,7 @@ export const sendFollowUpEmails = onSchedule(
     schedule: "0 10 * * *", // Daily at 10 AM UTC
     timeZone: "UTC",
     region: "us-central1",
+    secrets: [resendApiKey, defaultFromEmail, sendRealEmails],
   },
   async () => {
     try {
@@ -193,14 +178,23 @@ export const sendFollowUpEmails = onSchedule(
 
         try {
           // Generate and send follow-up email
-          const emailTemplate = EmailService.generateFollowUpEmail(email, postcode);
-          const success = await EmailService.sendEmail(emailTemplate);
+          const locationInfo = await getLocationFromPostcode(postcode);
+          const locationString = locationInfo
+            ? formatLocation(locationInfo.city, locationInfo.stateCode)
+            : postcode;
+
+          const emailTemplate = {
+            to: email,
+            templateId: EMAIL_TEMPLATES.FOLLOWUP_3DAY,
+            variables: { location: locationString }
+          };
+          const success = await EmailService.sendTemplateEmail(emailTemplate);
 
           if (success) {
             // Mark follow-up email as sent
             batch.update(doc.ref, {
               followUpEmailSent: true,
-              followUpEmailSentAt: admin.firestore.FieldValue.serverTimestamp(),
+              followUpEmailSentAt: FieldValue.serverTimestamp(),
             });
             emailsSent++;
 
@@ -212,7 +206,7 @@ export const sendFollowUpEmails = onSchedule(
             // Mark as failed
             batch.update(doc.ref, {
               followUpEmailFailed: true,
-              followUpEmailFailedAt: admin.firestore.FieldValue.serverTimestamp(),
+              followUpEmailFailedAt: FieldValue.serverTimestamp(),
             });
             emailsFailed++;
 
@@ -257,13 +251,16 @@ export const testEmail = onSchedule(
     logger.info("Test email function - this should only be triggered manually");
 
     // Test welcome email
-    const testWelcomeEmail = EmailService.generateWelcomeEmail(
-      "test@example.com",
-      "SW1A 1AA"
-    );
+    const testWelcomeEmail = {
+      to: "test@example.com",
+      templateId: EMAIL_TEMPLATES.WELCOME_COMPLETED,
+      variables: {
+        location: "London, UK"
+      }
+    };
 
     logger.info("Test email template generated", {
-      subject: testWelcomeEmail.subject,
+      templateId: testWelcomeEmail.templateId,
       to: testWelcomeEmail.to,
     });
   }
@@ -280,6 +277,7 @@ export const runDailyMatchingJob = onSchedule(
     schedule: "0 9 * * *", // Daily at 9 AM UTC
     timeZone: "UTC",
     region: "us-central1",
+    secrets: [resendApiKey, defaultFromEmail, sendRealEmails],
   },
   async () => {
     try {
@@ -298,11 +296,13 @@ export const runDailyMatchingJob = onSchedule(
  * Scheduled to run every 2 hours.
  * Sends introduction emails to newly formed groups.
  */
+
 export const processGroupEmails = onSchedule(
   {
     schedule: "0 */2 * * *", // Every 2 hours
     timeZone: "UTC",
     region: "us-central1",
+    secrets: [resendApiKey, defaultFromEmail, sendRealEmails],
   },
   async () => {
     try {
@@ -314,3 +314,103 @@ export const processGroupEmails = onSchedule(
     }
   }
 );
+
+/**
+ * Abandonment Recovery Email Function
+ *
+ * Scheduled to run hourly from 8am-8pm ET.
+ * Sends recovery emails to users who started onboarding but stopped for > 1 hour.
+ */
+export const sendAbandonedOnboardingEmails = onSchedule(
+  {
+    schedule: "0 8-20 * * *",
+    timeZone: "America/New_York",
+    region: "us-central1",
+    secrets: [resendApiKey, defaultFromEmail, sendRealEmails],
+  },
+  async () => {
+    try {
+      logger.info("🕐 Starting abandonment recovery job");
+
+      const db = admin.firestore();
+      const now = Date.now();
+      const oneHourAgo = now - (60 * 60 * 1000);
+
+      // Find profiles that haven't completed and were last updated > 1hr ago
+      const profilesQuery = db.collection("profiles")
+        .where("onboarded", "==", false)
+        .where("last_updated", "<=", oneHourAgo)
+        .limit(50); // Process in batches
+
+      const snapshot = await profilesQuery.get();
+
+      if (snapshot.empty) {
+        logger.info("No profiles found for abandonment recovery");
+        return;
+      }
+
+      logger.info(`📊 Processing ${snapshot.size} profiles`);
+
+      let emailsSent = 0;
+      let emailsSkipped = 0;
+
+      for (const doc of snapshot.docs) {
+        const profile = doc.data();
+
+        // Skip if no email, already sent abandonment/welcome email, or no session
+        if (!profile.email || profile.abandonment_sent ||
+            profile.welcomeEmailSent || !profile.session_id) {
+          emailsSkipped++;
+          continue;
+        }
+
+        try {
+          // Generate magic link
+           const magicLink = generateMagicLink(profile.session_id);
+
+          // Get location
+          const locationInfo = await getLocationFromPostcode(profile.postcode);
+          const locationString = locationInfo
+            ? formatLocation(locationInfo.city, locationInfo.stateCode)
+            : profile.postcode;
+
+          // Send welcome-abandoned email
+          const emailTemplate = {
+            to: profile.email,
+            templateId: EMAIL_TEMPLATES.WELCOME_ABANDONED,
+            variables: {
+              location: locationString,
+              magic_link: magicLink
+            }
+          };
+
+          const success = await EmailService.sendTemplateEmail(emailTemplate);
+
+          if (success) {
+            await doc.ref.update({
+              abandonment_sent: true,
+              abandonment_sent_at: Date.now(),
+            });
+
+            emailsSent++;
+
+            logger.info("✅ Abandonment email sent", {
+              session_id: profile.session_id,
+              email: profile.email,
+            });
+          }
+        } catch (error) {
+          logger.error("❌ Error sending abandonment email", {
+            session_id: profile.session_id,
+            error: error instanceof Error ? error.message : 'Unknown',
+          });
+        }
+      }
+
+      logger.info("📬 Job completed", { emailsSent, emailsSkipped });
+    } catch (error) {
+      logger.error("❌ Abandonment recovery job error:", error);
+    }
+  }
+);
+

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { database } from '../database';
 import { BLOG_POSTS } from '../utils/blogData';
+import { getLocationFromPostcode } from '../utils/location';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -37,8 +38,12 @@ const LandingPage: React.FC = () => {
 
       if (existingLead && existingLead.session_id && !signupForOther) {
         setErrorMessage(
-          "Looks like you've already signed up! Check your email for your personalized chat link."
+          "We found an existing account with this email. Check your inbox - we've sent you a link to continue your session."
         );
+        
+        // Trigger magic link email silently
+        await database.sendMagicLink(email);
+        
         setIsSubmitting(false);
         return;
       }
@@ -46,7 +51,7 @@ const LandingPage: React.FC = () => {
       let sessionId: string | undefined;
 
       if (!signupForOther) {
-        sessionId = `user-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+        sessionId = crypto.randomUUID();
       }
 
       if (!existingLead) {
@@ -63,6 +68,23 @@ const LandingPage: React.FC = () => {
 
       if (!signupForOther && sessionId) {
         await database.createProfile(sessionId, email, postcode);
+
+        // Fetch and store location data immediately so it's available for the onboarding agent
+        // This avoids making API calls during the conversation
+        try {
+          const locationInfo = await getLocationFromPostcode(postcode);
+          if (locationInfo) {
+            await database.updateProfile(sessionId, {
+              location: {
+                city: locationInfo.city,
+                state_code: locationInfo.stateCode
+              }
+            });
+          }
+        } catch (error) {
+          console.error('Error pre-fetching location:', error);
+          // Continue anyway - the agent will ask for location if missing
+        }
       }
 
       if (!signupForOther && sessionId) {
