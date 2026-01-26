@@ -578,7 +578,7 @@ const PhoneMockup = () => {
           <img
             key={index}
             src={img}
-            alt={`Inteface Preview ${index + 1}`}
+            alt={`Interface Preview ${index + 1}`}
             style={{
               position: 'absolute',
               top: 0,
