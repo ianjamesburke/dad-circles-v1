@@ -2,6 +2,9 @@
 
 This file provides guidance to Coding Agents for working with code in this repository.
 
+> [!CAUTION]
+> **CRITICAL SECURITY RULE**: NEVER commit API keys, secrets, or `.env` files to the repository. Always use `.env.example` as a template and ensure `.env` is in `.gitignore`.
+
 ## Overview
 
 Dad Circles Onboarding MVP is a conversational onboarding application built with React and Gemini 2.0 Flash LLM. The application guides new and expecting dads through a structured onboarding flow while collecting relevant user information (status, children, interests, location). The backend uses Firebase (Firestore for data, Cloud Functions for email), and the frontend is a Vite-powered React app with a test persona system and admin monitoring dashboard.
@@ -175,6 +178,9 @@ Firebase Cloud Functions (in `functions/`) trigger on:
 The `EmailService` class (`functions/src/emailService.ts`) abstracts Resend.com API calls.
 
 ## Environment Variables
+
+> [!CAUTION]
+> **NEVER commit your actual `.env` file or any API keys to version control.**
 
 Create a `.env` file in the root with:
 
