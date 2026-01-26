@@ -47,3 +47,4 @@ mobile-test.html
 
 # Testing
 coverage
+functions/src/resend-test.ts
