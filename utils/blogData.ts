@@ -51,7 +51,7 @@ DadCircles collects only what’s needed to match you. Your data isn’t sold. Y
 The goal isn’t to keep you engaged online — it’s to help a real group form offline.
     `,
         author: 'Nelson',
-        published_at: new Date('2026-01-26').getTime(),
+        published_at: new Date('2026-01-20').getTime(),
         is_published: true,
         cover_image: '/images/blog_bg_4.png',
         tags: ['Product', 'How to Join'],
@@ -137,7 +137,7 @@ The bot handles matching, introductions, and follow-ups so dads don’t have to 
 They fail because the system asks them to do everything themselves.
     `,
         author: 'Nelson',
-        published_at: new Date('2026-01-19').getTime(),
+        published_at: new Date('2026-01-13').getTime(),
         is_published: true,
         cover_image: '/images/blog_bg_3.png',
         tags: ['Community', 'Sociology'],
@@ -201,7 +201,7 @@ And it doesn’t have to stay this way.
 **Sign up. Invite a dad.**
     `,
         author: 'Nelson',
-        published_at: new Date('2026-01-15').getTime(),
+        published_at: new Date('2026-01-09').getTime(),
         is_published: true,
         cover_image: '/images/blog_bg_2.png',
         tags: ['Society', 'Mental Health'],
@@ -292,7 +292,7 @@ DadCircles exists to address that gap — not with therapy, content, or advice �
 Sign up. Invite a dad.
     `,
         author: 'Nelson',
-        published_at: new Date('2026-01-12').getTime(),
+        published_at: new Date('2026-01-06').getTime(),
         is_published: true,
         cover_image: '/images/blog_bg_1.png',
         tags: ['Mental Health', 'Research'],
@@ -363,7 +363,7 @@ They start with repetition.
 **Stick with it. We’ll help.**
     `,
         author: 'Nelson',
-        published_at: new Date('2026-01-05').getTime(),
+        published_at: new Date('2025-12-30').getTime(),
         is_published: true,
         cover_image: '/images/blog_bg_4.png',
         tags: ['Community', 'Research'],
@@ -432,7 +432,7 @@ We’re simply rebuilding the infrastructure to support that.
 Sign up. Invite a dad.
     `,
         author: 'Nelson',
-        published_at: new Date('2025-12-28').getTime(),
+        published_at: new Date('2025-12-23').getTime(),
         is_published: true,
         cover_image: '/images/blog_bg_3.png',
         tags: ['Philosophy', 'Product'],
@@ -469,7 +469,7 @@ Same logic. Same evidence base. Adapted to how dads connect:
 This is not an experiment. It’s a cultural catch-up.
     `,
         author: 'Nelson',
-        published_at: new Date('2025-12-15').getTime(),
+        published_at: new Date('2025-12-16').getTime(),
         is_published: true,
         cover_image: '/images/blog_bg_2.png',
         tags: ['Society', 'Parenting'],
@@ -509,7 +509,7 @@ It makes space for it.
 And sometimes, that’s all people need.
     `,
         author: 'Nelson',
-        published_at: new Date('2025-12-01').getTime(),
+        published_at: new Date('2025-12-09').getTime(),
         is_published: true,
         cover_image: '/images/blog_bg_1.png',
         tags: ['AI', 'Philosophy'],

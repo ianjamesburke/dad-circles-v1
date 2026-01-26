@@ -18,6 +18,17 @@ const BlogPostDetail: React.FC = () => {
 
     const post = BLOG_POSTS.find(p => p.slug === slug);
 
+    // Parse inline markdown (bold text)
+    const parseInlineMarkdown = (text: string): React.ReactNode => {
+        const parts = text.split(/(\*\*[^*]+\*\*)/g);
+        return parts.map((part, i) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+                return <strong key={i}>{part.slice(2, -2)}</strong>;
+            }
+            return part;
+        });
+    };
+
     if (!post) {
         return (
             <div style={{ padding: '100px', textAlign: 'center' }}>
@@ -31,20 +42,20 @@ const BlogPostDetail: React.FC = () => {
 
     return (
         <div style={styles.pageWrapper}>
-            {/* Navigation */}
-            <header style={styles.nav}>
-                <div onClick={() => navigate('/')} style={{ ...styles.logo, cursor: 'pointer' }}>
-                    <div style={styles.logoSquare}>DC</div>
-                    <div style={styles.logoText}>DadCircles</div>
-                </div>
-                <div style={styles.navLinks}>
-                    <Link to="/" style={styles.navLink}>Home</Link>
-                </div>
-            </header>
-
             <article>
                 {/* Banner */}
                 <div style={styles.banner}>
+                    {/* Navigation */}
+                    <header style={styles.nav}>
+                        <div onClick={() => navigate('/')} style={{ ...styles.logo, cursor: 'pointer' }}>
+                            <div style={styles.logoSquare}>DC</div>
+                            <div style={styles.logoText}>DadCircles</div>
+                        </div>
+                        <div style={styles.navLinks}>
+                            <Link to="/" style={styles.navLink}>Home</Link>
+                        </div>
+                    </header>
+
                     <div style={styles.container}>
                         <div style={styles.bannerContent}>
                             <div style={styles.meta}>
@@ -73,22 +84,56 @@ const BlogPostDetail: React.FC = () => {
                         <div style={styles.bodyContent}>
                             {post.content.split('\n\n').map((paragraph, idx) => {
                                 if (paragraph.startsWith('###')) {
-                                    return <h3 key={idx} style={styles.h3}>{paragraph.replace('###', '').trim()}</h3>;
+                                    return <h3 key={idx} style={styles.h3}>{parseInlineMarkdown(paragraph.replace('###', '').trim())}</h3>;
                                 }
-                                if (paragraph.startsWith('**')) {
-                                    // Simple bold block check
-                                    return <p key={idx} style={{ ...styles.p, fontWeight: 700 }}>{paragraph.replace(/\*\*/g, '')}</p>;
+                                if (paragraph.startsWith('**') && paragraph.endsWith('**')) {
+                                    // Bold block: must start AND end with **
+                                    return <p key={idx} style={{ ...styles.p, fontWeight: 700 }}>{paragraph.slice(2, -2)}</p>;
                                 }
-                                if (paragraph.includes('* ')) {
-                                    return (
-                                        <ul key={idx} style={styles.ul}>
-                                            {paragraph.split('\n').map((item, i) => (
-                                                <li key={i} style={styles.li}>{item.replace('* ', '').trim()}</li>
-                                            ))}
-                                        </ul>
-                                    );
+                                // Check if paragraph contains bullet points
+                                const lines = paragraph.split('\n');
+                                const bulletLines = lines.filter(line => line.trim().startsWith('* '));
+                                
+                                if (bulletLines.length > 0) {
+                                    // Mixed content: render non-bullets as paragraphs, bullets as list
+                                    const elements: React.ReactNode[] = [];
+                                    let currentBullets: string[] = [];
+                                    
+                                    lines.forEach((line, lineIdx) => {
+                                        const trimmedLine = line.trim();
+                                        if (trimmedLine.startsWith('* ')) {
+                                            currentBullets.push(trimmedLine.replace('* ', ''));
+                                        } else if (trimmedLine) {
+                                            // Flush any accumulated bullets first
+                                            if (currentBullets.length > 0) {
+                                                elements.push(
+                                                    <ul key={`${idx}-ul-${lineIdx}`} style={styles.ul}>
+                                                        {currentBullets.map((item, i) => (
+                                                            <li key={i} style={styles.li}>{parseInlineMarkdown(item)}</li>
+                                                        ))}
+                                                    </ul>
+                                                );
+                                                currentBullets = [];
+                                            }
+                                            // Render non-bullet line as paragraph
+                                            elements.push(<p key={`${idx}-p-${lineIdx}`} style={styles.p}>{parseInlineMarkdown(trimmedLine)}</p>);
+                                        }
+                                    });
+                                    
+                                    // Flush remaining bullets
+                                    if (currentBullets.length > 0) {
+                                        elements.push(
+                                            <ul key={`${idx}-ul-final`} style={styles.ul}>
+                                                {currentBullets.map((item, i) => (
+                                                    <li key={i} style={styles.li}>{parseInlineMarkdown(item)}</li>
+                                                ))}
+                                            </ul>
+                                        );
+                                    }
+                                    
+                                    return <React.Fragment key={idx}>{elements}</React.Fragment>;
                                 }
-                                return <p key={idx} style={styles.p}>{paragraph.trim()}</p>;
+                                return <p key={idx} style={styles.p}>{parseInlineMarkdown(paragraph.trim())}</p>;
                             })}
                         </div>
 
@@ -167,7 +212,7 @@ const getStyles = (isMobile: boolean) => ({
         top: 0,
         left: 0,
         right: 0,
-        zIndex: 10,
+        zIndex: 100,
     },
     logo: {
         display: 'flex',
