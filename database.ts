@@ -13,13 +13,14 @@ import {
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from './firebase';
-import { UserProfile, Message, OnboardingStep, Role, Lead, Group, MatchingStats, LifeStage } from './types';
+import { UserProfile, Message, OnboardingStep, Role, Lead, Group, MatchingStats, LifeStage, BlogPost } from './types';
 
 // Firestore collections
 const profilesCol = collection(db, 'profiles');
 const messagesCol = collection(db, 'messages');
 const leadsCol = collection(db, 'leads');
 const groupsCol = collection(db, 'groups');
+const postsCol = collection(db, 'posts');
 
 interface DatabaseInterface {
   // Profiles
@@ -45,6 +46,11 @@ interface DatabaseInterface {
   getAllGroups: () => Promise<Group[]>;
   getGroupsByLocation: (city: string, stateCode: string) => Promise<Group[]>;
   updateGroup: (groupId: string, updates: Partial<Group>) => Promise<Group>;
+
+  // Blog Posts
+  getAllBlogPosts: (publishedOnly?: boolean) => Promise<BlogPost[]>;
+  getBlogPostBySlug: (slug: string) => Promise<BlogPost | undefined>;
+  createBlogPost: (post: Omit<BlogPost, 'id' | 'published_at'>) => Promise<BlogPost>;
 
   // Matching
   getUnmatchedUsers: (city?: string, stateCode?: string) => Promise<UserProfile[]>;
@@ -216,6 +222,37 @@ export const database: DatabaseInterface = {
     await setDoc(ref, updates, { merge: true });
     const snap = await getDoc(ref);
     return snap.data() as Group;
+  },
+
+  // Blog Post operations
+  getAllBlogPosts: async (publishedOnly = true): Promise<BlogPost[]> => {
+    let q = query(postsCol, orderBy('published_at', 'desc'));
+
+    if (publishedOnly) {
+      q = query(postsCol, where('is_published', '==', true), orderBy('published_at', 'desc'));
+    }
+
+    const snap = await getDocs(q);
+    return snap.docs.map(d => d.data() as BlogPost);
+  },
+
+  getBlogPostBySlug: async (slug: string): Promise<BlogPost | undefined> => {
+    const q = query(postsCol, where('slug', '==', slug));
+    const snap = await getDocs(q);
+    if (snap.empty) return undefined;
+    return snap.docs[0].data() as BlogPost;
+  },
+
+  createBlogPost: async (post: Omit<BlogPost, 'id' | 'published_at'>): Promise<BlogPost> => {
+    const postId = `post-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const newPost: BlogPost = {
+      ...post,
+      id: postId,
+      published_at: Date.now(),
+    };
+    const ref = doc(postsCol, postId);
+    await setDoc(ref, newPost);
+    return newPost;
   },
 
   // Matching operations

@@ -15,16 +15,32 @@ import {
   AdminLeads,
   AdminTools,
 } from './components/admin';
+import BlogPage from './components/BlogPage';
+import BlogPostDetail from './components/BlogPostDetail';
+import TermsOfService from './components/TermsOfService';
+import PrivacyPolicy from './components/PrivacyPolicy';
+import CookiePolicy from './components/CookiePolicy';
+import CookieBanner from './components/CookieBanner';
 
 const App: React.FC = () => {
   return (
     <BrowserRouter>
+      <CookieBanner />
       <Routes>
         {/* Landing page - no layout wrapper */}
         <Route path="/" element={<LandingPage />} />
 
         {/* User chat - no layout wrapper */}
         <Route path="/chat" element={<UserChatInterface />} />
+
+        {/* Blog routes */}
+        <Route path="/blog" element={<BlogPage />} />
+        <Route path="/blog/:slug" element={<BlogPostDetail />} />
+
+        {/* Legal routes */}
+        <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/cookies" element={<CookiePolicy />} />
 
         {/* Admin routes - with dark layout and protection */}
         <Route path="/admin" element={
