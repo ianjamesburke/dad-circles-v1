@@ -208,7 +208,12 @@ export const UserChatInterface: React.FC = () => {
           role: Role.AGENT,
           content: result.message
         })
-      ]).catch(err => console.error('Background save failed:', err));
+      ]).then(async () => {
+        // Trigger completion email if applicable
+        if (isOnboardingComplete && profile.email) {
+          await db.sendCompletionEmail(profile.email, sessionId);
+        }
+      }).catch(err => console.error('Background save failed:', err));
 
     } catch (error) {
       console.error('Error getting response:', error);

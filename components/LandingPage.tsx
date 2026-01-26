@@ -36,8 +36,12 @@ const LandingPage: React.FC = () => {
       if (existingLead && existingLead.session_id && !signupForOther) {
         // User already signed up and started onboarding - don't expose their session
         setErrorMessage(
-          "Looks like you've already signed up! Check your email for your personalized chat link, or contact us if you need help."
+          "We found an existing account with this email. Check your inbox - we've sent you a link to continue your session."
         );
+        
+        // Trigger magic link email silently
+        await database.sendMagicLink(email);
+        
         setIsSubmitting(false);
         return;
       }
@@ -46,7 +50,7 @@ const LandingPage: React.FC = () => {
 
       // 3. If user is signing up for themselves, generate a session ID
       if (!signupForOther) {
-        sessionId = `user-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+        sessionId = crypto.randomUUID();
       }
 
       // 4. Handle lead creation/update

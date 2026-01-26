@@ -9,7 +9,7 @@
  */
 
 import * as admin from "firebase-admin";
-import * as logger from "firebase-functions/logger";
+import { logger } from "./logger";
 import { EmailService } from "./emailService";
 
 // Types
@@ -177,29 +177,7 @@ function validateAgeGap(users: UserProfile[], lifeStage: LifeStage, config: Matc
   return gapInMonths <= maxGap;
 }
 
-/**
- * Get unmatched users from Firestore
- */
-async function getUnmatchedUsers(city?: string, stateCode?: string): Promise<UserProfile[]> {
-  const db = admin.firestore();
-  let query = db.collection('profiles')
-    .where('matching_eligible', '==', true);
 
-  // Note: We filter group_id null/undefined in memory or via separate query if needed
-  // But strictly, we want users who DO NOT have a group_id
-
-  if (city && stateCode) {
-    query = query
-      .where('location.city', '==', city)
-      .where('location.state_code', '==', stateCode);
-  }
-
-  const snapshot = await query.get();
-  const allEligible = snapshot.docs.map(doc => doc.data() as UserProfile);
-
-  // Filter for those without a group_id
-  return allEligible.filter(user => !user.group_id);
-}
 
 /**
  * Form groups from a list of users
@@ -338,6 +316,25 @@ export async function sendGroupIntroductionEmails(
     logger.error("❌ Error sending emails", { error });
     return { success: false, emailedMembers: [] };
   }
+}
+
+/**
+ * Get unmatched users from Firestore
+ */
+async function getUnmatchedUsers(city?: string, stateCode?: string): Promise<UserProfile[]> {
+  const db = admin.firestore();
+  let query: admin.firestore.Query = db.collection('profiles')
+    .where('matching_eligible', '==', true)
+    .where('group_id', '==', null);
+
+  if (city && stateCode) {
+    query = query
+      .where('location.city', '==', city)
+      .where('location.state_code', '==', stateCode);
+  }
+
+  const snapshot = await query.get();
+  return snapshot.docs.map(doc => doc.data() as UserProfile);
 }
 
 /**
