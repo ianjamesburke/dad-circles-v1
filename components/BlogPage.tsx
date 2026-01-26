@@ -5,6 +5,7 @@ import { BLOG_POSTS } from '../utils/blogData';
 const BlogPage: React.FC = () => {
     const navigate = useNavigate();
     const [isMobile, setIsMobile] = useState(false);
+    const [hoveredCard, setHoveredCard] = useState<string | null>(null);
 
     useEffect(() => {
         const checkMobile = () => {
@@ -43,7 +44,16 @@ const BlogPage: React.FC = () => {
                 <div style={styles.container}>
                     <div style={styles.blogGrid}>
                         {BLOG_POSTS.map((post) => (
-                            <Link to={`/blog/${post.slug}`} key={post.id} style={styles.blogCard}>
+                            <Link
+                                to={`/blog/${post.slug}`}
+                                key={post.id}
+                                style={{
+                                    ...styles.blogCard,
+                                    ...(hoveredCard === post.slug ? styles.blogCardHover : {})
+                                }}
+                                onMouseEnter={() => setHoveredCard(post.slug)}
+                                onMouseLeave={() => setHoveredCard(null)}
+                            >
                                 <div style={styles.blogImageContainer}>
                                     <img src={post.cover_image} alt={post.title} style={styles.blogImage} />
                                     <div style={styles.blogTag}>{post.tags?.[0]}</div>
@@ -212,10 +222,10 @@ const getStyles = (isMobile: boolean) => ({
         transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         cursor: 'pointer',
         background: '#ffffff',
-        '&:hover': {
-            transform: 'translateY(-8px)',
-            boxShadow: '0 20px 40px -10px rgba(0,0,0,0.1)',
-        }
+    },
+    blogCardHover: {
+        transform: 'translateY(-8px)',
+        boxShadow: '0 20px 40px -10px rgba(0,0,0,0.1)',
     },
     blogImageContainer: {
         position: 'relative' as const,

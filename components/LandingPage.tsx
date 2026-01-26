@@ -17,6 +17,7 @@ const LandingPage: React.FC = () => {
   const [showShareDropdown, setShowShareDropdown] = useState(false);
   const [showNavShareDropdown, setShowNavShareDropdown] = useState(false);
   const [showMobileNav, setShowMobileNav] = useState(false);
+  const [isProofCardHovered, setIsProofCardHovered] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -285,7 +286,14 @@ const LandingPage: React.FC = () => {
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
       >
         <div style={styles.container}>
-          <div style={styles.proofCard}>
+          <div
+            style={{
+              ...styles.proofCard,
+              ...(isProofCardHovered ? styles.proofCardHover : {})
+            }}
+            onMouseEnter={() => setIsProofCardHovered(true)}
+            onMouseLeave={() => setIsProofCardHovered(false)}
+          >
             <div style={styles.vibeTag}>FIRST COHORTS FORMING NOW</div>
             <h2 style={styles.h2Dark}>Join the early circle</h2>
             <p style={styles.pDark}>Dad groups don’t happen by accident. We provide the lightweight structure to make them stick: local, practical, and consistent.</p>
@@ -964,9 +972,9 @@ const getStyles = (isMobile: boolean) => ({
     boxShadow: '0 40px 80px -20px rgba(15, 23, 42, 0.4)',
     cursor: 'pointer',
     transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease',
-    '&:hover': {
-      transform: 'translateY(-4px)',
-    }
+  },
+  proofCardHover: {
+    transform: 'translateY(-4px)',
   },
   vibeTag: {
     display: 'inline-block',
