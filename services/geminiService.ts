@@ -21,7 +21,17 @@ const getCurrentDateContext = () => {
   const now = new Date();
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 
                   'July', 'August', 'September', 'October', 'November', 'December'];
-  return `CURRENT DATE: ${months[now.getMonth()]} ${now.getFullYear()}. Use this to infer years when users mention months without specifying a year. If a user says "March" for an expecting dad, assume the upcoming March (${now.getMonth() >= 2 ? now.getFullYear() + 1 : now.getFullYear()} if we're past March, otherwise ${now.getFullYear()}).`;
+  const currentMonth = months[now.getMonth()];
+  const currentYear = now.getFullYear();
+  
+  return `CURRENT DATE: ${currentMonth} ${currentYear}.
+  
+DATE INFERENCE RULES:
+- Use the Current Date to infer years when users mention months/dates without specifying a year.
+- EXPECTING Dads: Assume the UPCOMING occurrence of the date.
+- CURRENT Dads: Assume the MOST RECENTLY PASSED occurrence of the date. Children cannot be born in the future.
+  - Example: If Current Date is Jan 2026 and a CURRENT dad says "born Dec 28", assume Dec 28, 2025 (past). Do NOT assume 2026 or 2028.
+  - Example: If Current Date is May 2026 and a CURRENT dad says "born Jan 5", assume Jan 5, 2026.`;
 };
 
 const SYSTEM_PROMPT = `You are the Dad Circles Onboarding Agent. Your task is to onboard users into Dad Circles in a conversational, human, warm, and lightly enthusiastic way. You are always context-aware and must follow the state-driven onboarding flow defined by onboarding_step.
