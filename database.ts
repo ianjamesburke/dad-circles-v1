@@ -1,4 +1,3 @@
-
 import {
     getUnmatchedUsers,
     getMatchingStats,
@@ -38,6 +37,11 @@ import {
     updateGroup,
 } from '@/services/groupService';
 import {
+    getAllBlogPosts,
+    getBlogPostBySlug,
+    createBlogPost,
+} from '@/services/blogService';
+import {
     seedTestData,
     resetDatabase,
     cleanTestData,
@@ -68,6 +72,11 @@ export const database = {
     getAllGroups,
     getGroupsByLocation,
     updateGroup,
+
+    // Blog Posts
+    getAllBlogPosts,
+    getBlogPostBySlug,
+    createBlogPost,
 
     // Matching
     getUnmatchedUsers,

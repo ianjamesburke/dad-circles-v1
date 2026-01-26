@@ -109,3 +109,17 @@ export interface MatchingResult {
   users_unmatched: number;
   summary: string;
 }
+
+export interface BlogPost {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string;
+  content: string; // Markdown or HTML
+  author: string;
+  published_at: number; // Timestamp
+  is_published: boolean;
+  cover_image?: string; // URL or path
+  tags?: string[];
+  read_time_minutes?: number;
+}
