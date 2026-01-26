@@ -21,7 +21,24 @@ const getCurrentDateContext = () => {
   const now = new Date();
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 
                   'July', 'August', 'September', 'October', 'November', 'December'];
-  return `CURRENT DATE: ${months[now.getMonth()]} ${now.getFullYear()}. Use this to infer years when users mention months without specifying a year. If a user says "March" for an expecting dad, assume the upcoming March (${now.getMonth() >= 2 ? now.getFullYear() + 1 : now.getFullYear()} if we're past March, otherwise ${now.getFullYear()}).`;
+  
+  return `CURRENT DATE: ${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}.
+
+DATE INFERENCE RULES:
+1. EXISTING CHILDREN (born already):
+   - If user mentions a month/day without a year (e.g., "born Dec 28" or "birthday is in March"), assume the MOST RECENT PAST occurrence.
+   - Example: If today is Jan 2026 and user says "Dec 28", they mean Dec 28, 2025 (NOT 2026 or 2028).
+   - Example: If today is Jan 2026 and user says "March", they mean March 2025.
+   - Existing children CANNOT be born in the future.
+
+2. EXPECTING CHILDREN (due dates):
+   - If user mentions a month without a year, assume the UPCOMING occurrence.
+   - Example: If today is Jan 2026 and user says "due in March", they mean March 2026.
+
+3. MIXED STATUS:
+   - A user can be BOTH an expecting dad AND a current dad.
+   - Apply date inference PER CHILD based on whether they are "expecting" (future) or "existing" (past).
+   - Do NOT use the overall profile status to infer dates for specific children.`;
 };
 
 const SYSTEM_PROMPT = `You are the Dad Circles Onboarding Agent. Your task is to onboard users into Dad Circles in a conversational, human, warm, and lightly enthusiastic way. You are always context-aware and must follow the state-driven onboarding flow defined by onboarding_step.
