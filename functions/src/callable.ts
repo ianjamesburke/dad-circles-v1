@@ -196,6 +196,7 @@ export const sendCompletionEmail = onCall(
         welcomeEmailSent: true,
         welcomeEmailSentAt: FieldValue.serverTimestamp(),
         welcomeEmailPending: false,
+        last_communication_at: FieldValue.serverTimestamp(), // Track for follow-up emails
       });
     }
   }

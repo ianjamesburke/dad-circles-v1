@@ -109,8 +109,24 @@ export class RateLimiter {
       return result;
     } catch (error) {
       logger.error('Rate limiter error', { email: normalizedEmail, error });
-      // Fail open - allow the request if rate limiter fails
-      return { allowed: true };
+      
+      // SECURITY: Fail-closed approach
+      // We prioritize security over availability. If the rate limiter encounters an error,
+      // we block the request rather than allowing it through. This prevents attackers from
+      // bypassing rate limiting by triggering errors in the system.
+      //
+      // Trade-offs:
+      // - Fail-closed (current): Prioritizes security. An attacker cannot bypass the limiter
+      //   even if it's malfunctioning. However, legitimate users may be temporarily blocked
+      //   if there's a bug in the rate limiter.
+      // - Fail-open (alternative): Prioritizes availability. A bug in the rate limiter won't
+      //   lock users out, but an attacker could potentially exploit the error to bypass
+      //   rate limiting entirely.
+      //
+      // Given that this protects a security-sensitive magic link endpoint, we choose to
+      // fail closed. If the rate limiter is broken, we'd rather temporarily block all
+      // requests than allow unlimited spam/enumeration attacks.
+      throw new Error('Rate limiter unavailable - request blocked for security');
     }
   }
 

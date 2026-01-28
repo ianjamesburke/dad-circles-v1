@@ -113,6 +113,7 @@ export const sendWelcomeEmail = onDocumentCreated(
           await event.data?.ref.update({
             signupOtherEmailSent: true,
             signupOtherEmailSentAt: FieldValue.serverTimestamp(),
+            last_communication_at: FieldValue.serverTimestamp(), // Track for follow-up emails
           });
           logger.info("Signup-other email sent", { leadId: event.params.leadId });
         } else {
@@ -142,8 +143,10 @@ export const sendWelcomeEmail = onDocumentCreated(
  * Sends follow-up emails to leads who received a welcome or abandonment email
  * 24+ hours ago and haven't received a follow-up email yet.
  * 
- * Note: We need to query separately for welcomeEmailSent and abandonmentEmailSent
- * because Firestore doesn't support OR queries on different fields.
+ * Uses the unified `last_communication_at` field to simplify querying.
+ * This field is set whenever a welcome-completed, welcome-abandoned, or
+ * signup-other email is sent, allowing us to use a single query instead
+ * of multiple queries with deduplication.
  */
 export const sendFollowUpEmails = onSchedule(
   {
@@ -160,53 +163,30 @@ export const sendFollowUpEmails = onSchedule(
       const now = Date.now();
       const oneDayAgo = now - (24 * 60 * 60 * 1000); // 24 hours ago
 
-      // Query 1: Leads who completed onboarding (welcomeEmailSent)
-      const completedLeadsQuery = db.collection("leads")
-        .where("timestamp", "<=", oneDayAgo)
-        .where("welcomeEmailSent", "==", true)
+      // Single unified query using last_communication_at
+      // This replaces the previous dual-query approach (welcomeEmailSent + abandonmentEmailSent)
+      // and eliminates the need for manual deduplication
+      const leadsQuery = db.collection("leads")
+        .where("last_communication_at", "<=", oneDayAgo)
         .where("followUpEmailSent", "!=", true)
-        .limit(25);
+        .limit(50);
 
-      // Query 2: Leads who abandoned (abandonmentEmailSent)
-      const abandonedLeadsQuery = db.collection("leads")
-        .where("timestamp", "<=", oneDayAgo)
-        .where("abandonmentEmailSent", "==", true)
-        .where("followUpEmailSent", "!=", true)
-        .limit(25);
+      const snapshot = await leadsQuery.get();
 
-      const [completedSnapshot, abandonedSnapshot] = await Promise.all([
-        completedLeadsQuery.get(),
-        abandonedLeadsQuery.get()
-      ]);
-
-      // Combine results and deduplicate by email
-      const leadsMap = new Map();
-      
-      completedSnapshot.docs.forEach(doc => {
-        const data = doc.data();
-        leadsMap.set(data.email, { doc, data });
-      });
-      
-      abandonedSnapshot.docs.forEach(doc => {
-        const data = doc.data();
-        if (!leadsMap.has(data.email)) {
-          leadsMap.set(data.email, { doc, data });
-        }
-      });
-
-      if (leadsMap.size === 0) {
+      if (snapshot.empty) {
         logger.info("No leads found for follow-up emails");
         return;
       }
 
-      logger.info(`Processing ${leadsMap.size} leads for follow-up emails`);
+      logger.info(`Processing ${snapshot.size} leads for follow-up emails`);
 
       const batch = db.batch();
       let emailsSent = 0;
       let emailsFailed = 0;
 
       // Process each lead
-      for (const { doc, data: leadData } of leadsMap.values()) {
+      for (const doc of snapshot.docs) {
+        const leadData = doc.data();
         const { email, postcode } = leadData;
 
         try {
@@ -268,7 +248,7 @@ export const sendFollowUpEmails = onSchedule(
       await batch.commit();
 
       logger.info("Follow-up email job completed", {
-        totalProcessed: leadsMap.size,
+        totalProcessed: snapshot.size,
         emailsSent,
         emailsFailed,
       });
@@ -428,6 +408,7 @@ export const sendAbandonedOnboardingEmails = onSchedule(
               await leadSnap.docs[0].ref.update({
                 abandonmentEmailSent: true,
                 abandonmentEmailSentAt: FieldValue.serverTimestamp(),
+                last_communication_at: FieldValue.serverTimestamp(), // Track for follow-up emails
               });
             }
 

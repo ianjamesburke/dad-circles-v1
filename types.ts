@@ -91,6 +91,10 @@ export interface Lead {
   followUpEmailSentAt?: any; // Firestore timestamp
   followUpEmailFailed?: boolean;
   followUpEmailFailedAt?: any; // Firestore timestamp
+
+  // Unified communication tracking (simplifies follow-up queries)
+  // Updated whenever a welcome or abandonment email is sent
+  last_communication_at?: any; // Firestore timestamp
 }
 
 export enum LifeStage {
