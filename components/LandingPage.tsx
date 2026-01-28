@@ -38,12 +38,23 @@ const LandingPage: React.FC = () => {
       const existingLead = await database.getLeadByEmail(email);
 
       if (existingLead && existingLead.session_id && !signupForOther) {
-        setErrorMessage(
-          "We found an existing account with this email. Check your inbox - we've sent you a link to continue your session."
-        );
-        
-        // Trigger magic link email silently
-        await database.sendMagicLink(email);
+        try {
+          // Trigger magic link email with rate limiting
+          await database.sendMagicLink(email);
+          
+          setErrorMessage(
+            "We found an existing account with this email. Check your inbox - we've sent you a link to continue your session."
+          );
+        } catch (error: any) {
+          // Handle rate limit errors gracefully
+          if (error?.code === 'functions/resource-exhausted') {
+            setErrorMessage(error.message || 'Too many requests. Please try again later.');
+          } else {
+            setErrorMessage(
+              "We found an existing account with this email. If you don't receive an email, please try again in a few minutes."
+            );
+          }
+        }
         
         setIsSubmitting(false);
         return;

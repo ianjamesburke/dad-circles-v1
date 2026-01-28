@@ -203,7 +203,7 @@ async function formGroupsFromUsers(
     if (chunk.length < config.minGroupSize) break;
     if (!validateAgeGap(chunk, lifeStage, config)) continue;
 
-    const groupId = `group-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const groupId = crypto.randomUUID();
     const groupName = `${location.city} ${lifeStage} Dads - Group ${groupSequence}`;
 
     const group: Group = {
@@ -717,8 +717,4 @@ export async function seedTestData(): Promise<void> {
 
   await batch.commit();
   logger.info(`🌱 Successfully seeded ${testUsers.length} test users`);
-}
-
-export async function sendPendingGroupEmails(): Promise<void> {
-  // Stub for now, can implement if needed or just use runMatching
 }

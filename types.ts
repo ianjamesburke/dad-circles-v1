@@ -45,6 +45,12 @@ export interface UserProfile {
   group_id?: string; // Reference to assigned group
   matched_at?: number; // Timestamp when matched
   matching_eligible: boolean; // True if onboarded with valid location and child data
+
+  // Email tracking fields
+  abandonment_sent?: boolean;
+  abandonment_sent_at?: number;
+  welcomeEmailSent?: boolean;
+  welcomeEmailSentAt?: number;
 }
 
 export interface Message {
@@ -69,7 +75,18 @@ export interface Lead {
   welcomeEmailSentAt?: any; // Firestore timestamp
   welcomeEmailFailed?: boolean;
   welcomeEmailFailedAt?: any; // Firestore timestamp
+  welcomeEmailPending?: boolean;
+  welcomeEmailPendingAt?: any; // Firestore timestamp
 
+  // Abandonment email tracking (separate from welcome)
+  abandonmentEmailSent?: boolean;
+  abandonmentEmailSentAt?: any; // Firestore timestamp
+
+  // Signup-other email tracking
+  signupOtherEmailSent?: boolean;
+  signupOtherEmailSentAt?: any; // Firestore timestamp
+
+  // Follow-up email tracking
   followUpEmailSent?: boolean;
   followUpEmailSentAt?: any; // Firestore timestamp
   followUpEmailFailed?: boolean;

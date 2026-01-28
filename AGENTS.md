@@ -70,7 +70,7 @@ npm run emulator:seed
 ### High-Level Data Flow
 
 1. **Frontend (React/Vite)** → User interacts with chat interface or landing page
-2. **ChatInterface.tsx** → Processes user messages, manages conversation state
+2. **UserChatInterface.tsx** → Processes user messages, manages conversation state (production)
 3. **Gemini Service** (`services/geminiService.ts`) → Calls Google Gemini API with context, manages onboarding step logic
 4. **Database** (`database.ts`) → Firestore operations via Firebase Client SDK (profiles, messages, leads, groups)
 5. **Firebase Callable Functions** (`functions/src/callable.ts`) → Backend logic for matching, emails, magic links
@@ -78,7 +78,7 @@ npm run emulator:seed
 
 ### Key Directories
 
-- **`/components`** - React components: ChatInterface, LandingPage, Layout, ContextTestPanel
+- **`/components`** - React components: UserChatInterface (production), AdminChatInterface (testing), LandingPage, Layout
 - **`/components/admin`** - Modular admin dashboard: AdminLayout, AdminUsers, AdminGroups, AdminLeads, AdminOverview, AdminTools
 - **`/services`** - Core business logic: Gemini API integration, context management, matching
 - **`/utils`** - Utilities: analytics, location helpers, logger

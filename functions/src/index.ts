@@ -18,7 +18,7 @@ import { logger, DebugLogger } from "./logger";
 import { EmailService, EMAIL_TEMPLATES } from "./emailService";
 import { getLocationFromPostcode, formatLocation } from "./utils/location";
 import { generateMagicLink } from "./utils/link";
-import { runDailyMatching, sendPendingGroupEmails } from "./matching";
+import { runDailyMatching } from "./matching";
 
 // Define secrets - these are automatically loaded from .env in emulator mode
 // and from Cloud Secret Manager in production
@@ -133,8 +133,11 @@ export const sendWelcomeEmail = onDocumentCreated(
  * Follow-up Email Function
  *
  * Scheduled to run daily at 10 AM UTC (adjust timezone as needed).
- * Sends follow-up emails to leads who signed up 24+ hours ago
- * and haven't received a follow-up email yet.
+ * Sends follow-up emails to leads who received a welcome or abandonment email
+ * 24+ hours ago and haven't received a follow-up email yet.
+ * 
+ * Note: We need to query separately for welcomeEmailSent and abandonmentEmailSent
+ * because Firestore doesn't support OR queries on different fields.
  */
 export const sendFollowUpEmails = onSchedule(
   {
@@ -151,29 +154,53 @@ export const sendFollowUpEmails = onSchedule(
       const now = Date.now();
       const oneDayAgo = now - (24 * 60 * 60 * 1000); // 24 hours ago
 
-      // Query for leads that need follow-up emails
-      const leadsQuery = db.collection("leads")
+      // Query 1: Leads who completed onboarding (welcomeEmailSent)
+      const completedLeadsQuery = db.collection("leads")
         .where("timestamp", "<=", oneDayAgo)
         .where("welcomeEmailSent", "==", true)
         .where("followUpEmailSent", "!=", true)
-        .limit(50); // Process in batches to avoid timeouts
+        .limit(25);
 
-      const snapshot = await leadsQuery.get();
+      // Query 2: Leads who abandoned (abandonmentEmailSent)
+      const abandonedLeadsQuery = db.collection("leads")
+        .where("timestamp", "<=", oneDayAgo)
+        .where("abandonmentEmailSent", "==", true)
+        .where("followUpEmailSent", "!=", true)
+        .limit(25);
 
-      if (snapshot.empty) {
+      const [completedSnapshot, abandonedSnapshot] = await Promise.all([
+        completedLeadsQuery.get(),
+        abandonedLeadsQuery.get()
+      ]);
+
+      // Combine results and deduplicate by email
+      const leadsMap = new Map();
+      
+      completedSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        leadsMap.set(data.email, { doc, data });
+      });
+      
+      abandonedSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        if (!leadsMap.has(data.email)) {
+          leadsMap.set(data.email, { doc, data });
+        }
+      });
+
+      if (leadsMap.size === 0) {
         logger.info("No leads found for follow-up emails");
         return;
       }
 
-      logger.info(`Processing ${snapshot.size} leads for follow-up emails`);
+      logger.info(`Processing ${leadsMap.size} leads for follow-up emails`);
 
       const batch = db.batch();
       let emailsSent = 0;
       let emailsFailed = 0;
 
       // Process each lead
-      for (const doc of snapshot.docs) {
-        const leadData = doc.data();
+      for (const { doc, data: leadData } of leadsMap.values()) {
         const { email, postcode } = leadData;
 
         try {
@@ -228,7 +255,7 @@ export const sendFollowUpEmails = onSchedule(
       await batch.commit();
 
       logger.info("Follow-up email job completed", {
-        totalProcessed: snapshot.size,
+        totalProcessed: leadsMap.size,
         emailsSent,
         emailsFailed,
       });
@@ -291,35 +318,14 @@ export const runDailyMatchingJob = onSchedule(
 );
 
 /**
- * Group Email Processing Function
- *
- * Scheduled to run every 2 hours.
- * Sends introduction emails to newly formed groups.
- */
-
-export const processGroupEmails = onSchedule(
-  {
-    schedule: "0 */2 * * *", // Every 2 hours
-    timeZone: "UTC",
-    region: "us-central1",
-    secrets: [resendApiKey, defaultFromEmail, sendRealEmails],
-  },
-  async () => {
-    try {
-      logger.info("📧 Starting group email processing job");
-      await sendPendingGroupEmails();
-      logger.info("✅ Group email processing job completed successfully");
-    } catch (error) {
-      logger.error("❌ Group email processing job failed:", error);
-    }
-  }
-);
-
-/**
  * Abandonment Recovery Email Function
  *
  * Scheduled to run hourly from 8am-8pm ET.
  * Sends recovery emails to users who started onboarding but stopped for > 1 hour.
+ * 
+ * Note: last_updated tracks both profile changes AND user activity (messages).
+ * This means users actively chatting won't receive abandonment emails (correct behavior).
+ * The email is sent 1 hour after the user's last interaction.
  */
 export const sendAbandonedOnboardingEmails = onSchedule(
   {
@@ -387,10 +393,24 @@ export const sendAbandonedOnboardingEmails = onSchedule(
           const success = await EmailService.sendTemplateEmail(emailTemplate);
 
           if (success) {
+            // Update profile
             await doc.ref.update({
               abandonment_sent: true,
               abandonment_sent_at: Date.now(),
             });
+
+            // Update lead record to track abandonment email
+            const leadQuery = db.collection("leads")
+              .where("email", "==", profile.email.toLowerCase())
+              .limit(1);
+            const leadSnap = await leadQuery.get();
+
+            if (!leadSnap.empty) {
+              await leadSnap.docs[0].ref.update({
+                abandonmentEmailSent: true,
+                abandonmentEmailSentAt: FieldValue.serverTimestamp(),
+              });
+            }
 
             emailsSent++;
 

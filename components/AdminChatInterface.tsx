@@ -3,13 +3,27 @@ import { db } from '../store';
 import { getAgentResponse } from '../services/geminiService';
 import { Role, Message, OnboardingStep } from '../types';
 
+/**
+ * AdminChatInterface - Testing tool for admins/developers
+ * 
+ * This component provides a quick way to test the onboarding flow with
+ * predefined test personas without going through the landing page.
+ * 
+ * Features:
+ * - Switch between test personas (User A, B, C)
+ * - Debug UI showing onboarding step status
+ * - Protected by admin authentication
+ * 
+ * For production user chat, see UserChatInterface.tsx
+ */
+
 const TEST_SESSIONS = [
   { id: 'user-a-complete', label: 'User A' },
   { id: 'user-b-expecting', label: 'User B' },
   { id: 'user-c-fresh', label: 'User C' }
 ];
 
-export const ChatInterface: React.FC = () => {
+export const AdminChatInterface: React.FC = () => {
   const [sessionId, setSessionId] = useState(() => {
     return localStorage.getItem('dad_circles_active_test_session') || TEST_SESSIONS[0].id;
   });
@@ -137,6 +151,16 @@ export const ChatInterface: React.FC = () => {
         role: Role.AGENT,
         content: result.message
       });
+
+      // Send completion email if onboarding is complete and user has email
+      if (isComplete && profile.email) {
+        try {
+          await db.sendCompletionEmail(profile.email, sessionId);
+        } catch (error) {
+          console.error('Error sending completion email:', error);
+          // Don't block the UI if email fails
+        }
+      }
 
       await loadMessages(sessionId);
       await loadProfile(sessionId);

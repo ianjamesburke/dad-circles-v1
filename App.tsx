@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Layout } from './components/Layout';
-import { ChatInterface } from './components/ChatInterface';
+import { AdminChatInterface } from './components/AdminChatInterface';
 import LandingPage from './components/LandingPage';
 import UserChatInterface from './components/UserChatInterface';
 import { ProtectedAdminDashboard } from './components/ProtectedAdminDashboard';
@@ -59,11 +59,11 @@ const App: React.FC = () => {
           <Route path="tools" element={<AdminTools />} />
         </Route>
 
-        {/* Legacy admin chat route */}
+        {/* Admin testing chat - for developers to test onboarding flows */}
         <Route path="/admin-chat" element={
           <ProtectedAdminDashboard>
             <Layout>
-              <ChatInterface />
+              <AdminChatInterface />
             </Layout>
           </ProtectedAdminDashboard>
         } />

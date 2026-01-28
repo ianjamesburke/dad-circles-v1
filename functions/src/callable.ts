@@ -7,6 +7,7 @@ import { EmailService, EMAIL_TEMPLATES } from './emailService';
 import { getLocationFromPostcode, formatLocation } from './utils/location';
 import { generateMagicLink } from "./utils/link";
 import { runMatchingAlgorithm, seedTestData, approveAndEmailGroup, deleteGroup as deleteGroupLogic } from "./matching";
+import { RateLimiter } from "./rateLimiter";
 
 // Define secrets for callable functions
 const resendApiKey = defineSecret("RESEND_API_KEY");
@@ -41,6 +42,7 @@ export const runMatching = onCall({ cors: true }, async (request) => {
 
 /**
  * Send a magic link to resume a session
+ * Rate limited to prevent spam attacks
  */
 export const sendMagicLink = onCall(
   {
@@ -54,6 +56,13 @@ export const sendMagicLink = onCall(
     throw new HttpsError('invalid-argument', 'Email is required');
   }
 
+  // Rate limit check - prevents spam attacks
+  const rateLimitCheck = await RateLimiter.checkMagicLinkRequest(email);
+  if (!rateLimitCheck.allowed) {
+    logger.warn('Magic link request blocked by rate limiter', { email: email.toLowerCase() });
+    throw new HttpsError('resource-exhausted', rateLimitCheck.reason || 'Too many requests');
+  }
+
   const db = admin.firestore();
 
   // Find profile by email
@@ -65,6 +74,8 @@ export const sendMagicLink = onCall(
 
   if (snapshot.empty) {
     // Don't reveal whether email exists (prevent enumeration)
+    // But still count against rate limit
+    logger.info('Magic link requested for non-existent email', { email: email.toLowerCase() });
     return { success: true };
   }
 
@@ -72,11 +83,12 @@ export const sendMagicLink = onCall(
 
   // Only send if profile has session
   if (!profile.session_id) {
+    logger.info('Magic link requested for profile without session', { email: email.toLowerCase() });
     return { success: true };
   }
 
   // Generate magic link
-        const magicLink = generateMagicLink(profile.session_id);
+  const magicLink = generateMagicLink(profile.session_id);
 
   // Get location string
   const locationInfo = await getLocationFromPostcode(profile.postcode);
