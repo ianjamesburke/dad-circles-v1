@@ -32,7 +32,7 @@ export const getBlogPostBySlug = async (slug: string): Promise<BlogPost | undefi
 };
 
 export const createBlogPost = async (post: Omit<BlogPost, 'id' | 'published_at'>): Promise<BlogPost> => {
-    const postId = `post-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    const postId = crypto.randomUUID();
     const newPost: BlogPost = {
         ...post,
         id: postId,
