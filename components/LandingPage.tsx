@@ -117,7 +117,8 @@ const LandingPage: React.FC = () => {
   return (
     <div style={styles.pageWrapper}>
       {/* Navigation / Header */}
-      <header style={styles.nav}>
+      <div style={styles.navWrapper}>
+        <header style={styles.nav}>
         <div style={styles.logo} onClick={() => navigate('/')}>
           <div style={styles.logoSquare}>DC</div>
           <div style={styles.logoText}>DadCircles</div>
@@ -186,11 +187,34 @@ const LandingPage: React.FC = () => {
                 >
                   <i className="fab fa-twitter" style={{ width: '20px' }}></i> Twitter
                 </a>
+                <a
+                  href={`mailto:?subject=Check out DadCircles&body=I found something called DadCircles. It matches local Dads and makes it easy to meet up. Thought of you. Want an invite? https://dadcircles.com`}
+                  onClick={() => {
+                    setShowNavShareDropdown(false);
+                    if (isMobile) setShowMobileNav(false);
+                  }}
+                  style={styles.shareDropdownOption}
+                >
+                  <i className="fas fa-envelope" style={{ width: '20px' }}></i> Email
+                </a>
+                <a
+                  href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent('https://dadcircles.com')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => {
+                    setShowNavShareDropdown(false);
+                    if (isMobile) setShowMobileNav(false);
+                  }}
+                  style={styles.shareDropdownOption}
+                >
+                  <i className="fab fa-facebook" style={{ width: '20px' }}></i> Facebook
+                </a>
               </div>
             )}
           </div>
         </div>
       </header>
+      </div>
 
       {/* Hero Section */}
       <section id="join" style={styles.heroSection}>
@@ -471,6 +495,26 @@ const LandingPage: React.FC = () => {
                     >
                       <i className="fab fa-twitter" style={{ width: '20px' }}></i> Twitter
                     </a>
+                    <a
+                      href={`mailto:?subject=Check out DadCircles&body=I found something called DadCircles. It matches local Dads and makes it easy to meet up. Thought of you. Want an invite? https://dadcircles.com`}
+                      onClick={() => {
+                        setShowShareDropdown(false);
+                      }}
+                      style={styles.shareDropdownOption}
+                    >
+                      <i className="fas fa-envelope" style={{ width: '20px' }}></i> Email
+                    </a>
+                    <a
+                      href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent('https://dadcircles.com')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => {
+                        setShowShareDropdown(false);
+                      }}
+                      style={styles.shareDropdownOption}
+                    >
+                      <i className="fab fa-facebook" style={{ width: '20px' }}></i> Facebook
+                    </a>
                   </div>
                 )}
               </div>
@@ -520,6 +564,13 @@ const LandingPage: React.FC = () => {
               aria-label="LinkedIn"
             >
               <i className="fab fa-linkedin"></i>
+            </a>
+            <a
+              href="mailto:info@dadcircles.com"
+              style={{ ...styles.iconLink, fontSize: '1.25rem' }}
+              aria-label="Contact us via email"
+            >
+              <i className="fas fa-envelope"></i>
             </a>
           </div>
 
@@ -609,7 +660,6 @@ const getStyles = (isMobile: boolean) => ({
     fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
     color: '#1e293b',
     background: '#ffffff',
-    overflowX: 'hidden' as const,
     fontSize: isMobile ? '16px' : '18px', // Base font size increase
   },
   container: {
@@ -618,6 +668,16 @@ const getStyles = (isMobile: boolean) => ({
     padding: isMobile ? '0 20px' : '0 32px',
     width: '100%',
     boxSizing: 'border-box' as const,
+  },
+  navWrapper: {
+    position: 'sticky' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+    zIndex: 1000,
+    background: '#ffffff',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
   },
   nav: {
     display: 'flex',
@@ -628,9 +688,8 @@ const getStyles = (isMobile: boolean) => ({
     margin: '0 auto',
     paddingLeft: isMobile ? '20px' : '32px',
     paddingRight: isMobile ? '20px' : '32px',
-    position: 'relative' as const,
-    zIndex: 1000,
-    background: '#ffffff',
+    width: '100%',
+    boxSizing: 'border-box' as const,
   },
   logo: {
     display: 'flex',

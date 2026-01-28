@@ -39,15 +39,12 @@ const CookieBanner: React.FC = () => {
         <div style={styles.bannerWrapper}>
             <div style={styles.container}>
                 <div style={styles.content}>
-                    <div style={styles.textGroup}>
-                        <h4 style={styles.title}>Cookie Settings</h4>
-                        <p style={styles.text}>
-                            We use cookies to improve your experience and analyze our traffic. By clicking "Accept All", you consent to our use of all cookies. You can manage your preferences in our <Link to="/cookies" style={styles.link}>Cookie Policy</Link>.
-                        </p>
-                    </div>
+                    <p style={styles.text}>
+                        We use cookies. <Link to="/cookies" style={styles.link}>Learn more</Link>
+                    </p>
                     <div style={styles.buttonGroup}>
-                        <button onClick={handleRejectNonEssential} style={styles.secondaryButton}>Reject Non-Essential</button>
-                        <button onClick={handleAcceptAll} style={styles.primaryButton}>Accept All</button>
+                        <button onClick={handleRejectNonEssential} style={styles.secondaryButton}>Reject</button>
+                        <button onClick={handleAcceptAll} style={styles.primaryButton}>Accept</button>
                     </div>
                 </div>
             </div>
@@ -58,43 +55,28 @@ const CookieBanner: React.FC = () => {
 const styles = {
     bannerWrapper: {
         position: 'fixed' as const,
-        bottom: '24px',
-        left: '24px',
-        right: '24px',
+        bottom: '16px',
+        right: '16px',
         zIndex: 1000,
-        animation: 'slideUp 0.5s ease-out',
+        animation: 'slideUp 0.3s ease-out',
     },
     container: {
-        maxWidth: '1200px',
-        margin: '0 auto',
         background: '#ffffff',
-        borderRadius: '24px',
-        padding: '24px 32px',
-        boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
-        border: '1px solid #f1f5f9',
+        borderRadius: '12px',
+        padding: '12px 16px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        border: '1px solid #e2e8f0',
+        maxWidth: '280px',
     },
     content: {
         display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: '32px',
-        flexWrap: 'wrap' as const,
-    },
-    textGroup: {
-        flex: 1,
-        minWidth: '300px',
-    },
-    title: {
-        fontSize: '1.1rem',
-        fontWeight: 700,
-        color: '#0f172a',
-        marginBottom: '4px',
-        margin: 0,
+        flexDirection: 'column' as const,
+        gap: '10px',
     },
     text: {
-        fontSize: '0.95rem',
+        fontSize: '0.8rem',
         color: '#64748b',
-        lineHeight: 1.5,
+        lineHeight: 1.4,
         margin: 0,
     },
     link: {
@@ -104,29 +86,31 @@ const styles = {
     },
     buttonGroup: {
         display: 'flex',
-        gap: '12px',
+        gap: '8px',
     },
     primaryButton: {
         background: '#0f172a',
         color: 'white',
-        padding: '12px 24px',
-        borderRadius: '100px',
-        fontSize: '0.95rem',
+        padding: '6px 16px',
+        borderRadius: '6px',
+        fontSize: '0.8rem',
         fontWeight: 600,
         border: 'none',
         cursor: 'pointer',
         whiteSpace: 'nowrap' as const,
+        flex: 1,
     },
     secondaryButton: {
         background: '#f1f5f9',
         color: '#475569',
-        padding: '12px 24px',
-        borderRadius: '100px',
-        fontSize: '0.95rem',
+        padding: '6px 16px',
+        borderRadius: '6px',
+        fontSize: '0.8rem',
         fontWeight: 600,
         border: 'none',
         cursor: 'pointer',
         whiteSpace: 'nowrap' as const,
+        flex: 1,
     },
 };
 
