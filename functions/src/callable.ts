@@ -92,6 +92,12 @@ export const sendMagicLink = onCall(
 
   // Get location string
   const locationInfo = await getLocationFromPostcode(profile.postcode);
+  if (!locationInfo) {
+    logger.warn("⚠️ Location lookup failed, using postcode fallback", {
+      postcode: profile.postcode,
+      email: email.toLowerCase()
+    });
+  }
   const locationString = locationInfo
     ? formatLocation(locationInfo.city, locationInfo.stateCode)
     : profile.postcode;
@@ -151,6 +157,12 @@ export const sendCompletionEmail = onCall(
 
   // Get location
   const locationInfo = await getLocationFromPostcode(profile.postcode);
+  if (!locationInfo) {
+    logger.warn("⚠️ Location lookup failed, using postcode fallback", {
+      postcode: profile.postcode,
+      email: email.toLowerCase()
+    });
+  }
   const locationString = locationInfo
     ? formatLocation(locationInfo.city, locationInfo.stateCode)
     : profile.postcode;
@@ -317,6 +329,12 @@ export const sendManualAbandonmentEmail = onCall(
 
         // Get location
         const locationInfo = await getLocationFromPostcode(profile.postcode);
+        if (!locationInfo) {
+          logger.warn("⚠️ Location lookup failed, using postcode fallback", {
+            postcode: profile.postcode,
+            sessionId: sessionId
+          });
+        }
         const locationString = locationInfo
             ? formatLocation(locationInfo.city, locationInfo.stateCode)
             : profile.postcode;
@@ -336,7 +354,7 @@ export const sendManualAbandonmentEmail = onCall(
         if (success) {
             await profileRef.update({
                 abandonment_sent: true,
-                abandonment_sent_at: Date.now(),
+                abandonment_sent_at: FieldValue.serverTimestamp(),
             });
             logger.info("✅ Manual abandonment email sent successfully", { sessionId });
             return { success: true, message: 'Abandonment email sent successfully.' };

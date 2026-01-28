@@ -91,6 +91,12 @@ export const sendWelcomeEmail = onDocumentCreated(
         DebugLogger.info("📧 Sending immediate email for 'signup for other'", { email });
         
         const locationInfo = await getLocationFromPostcode(postcode);
+        if (!locationInfo) {
+          logger.warn("⚠️ Location lookup failed, using postcode fallback", {
+            postcode: postcode,
+            email: email
+          });
+        }
         const locationString = locationInfo
           ? formatLocation(locationInfo.city, locationInfo.stateCode)
           : postcode;
@@ -206,6 +212,13 @@ export const sendFollowUpEmails = onSchedule(
         try {
           // Generate and send follow-up email
           const locationInfo = await getLocationFromPostcode(postcode);
+          if (!locationInfo) {
+            logger.warn("⚠️ Location lookup failed, using postcode fallback", {
+              postcode: postcode,
+              email: email,
+              leadId: doc.id
+            });
+          }
           const locationString = locationInfo
             ? formatLocation(locationInfo.city, locationInfo.stateCode)
             : postcode;
@@ -376,6 +389,12 @@ export const sendAbandonedOnboardingEmails = onSchedule(
 
           // Get location
           const locationInfo = await getLocationFromPostcode(profile.postcode);
+          if (!locationInfo) {
+            logger.warn("⚠️ Location lookup failed, using postcode fallback", {
+              postcode: profile.postcode,
+              session_id: profile.session_id
+            });
+          }
           const locationString = locationInfo
             ? formatLocation(locationInfo.city, locationInfo.stateCode)
             : profile.postcode;
@@ -396,7 +415,7 @@ export const sendAbandonedOnboardingEmails = onSchedule(
             // Update profile
             await doc.ref.update({
               abandonment_sent: true,
-              abandonment_sent_at: Date.now(),
+              abandonment_sent_at: FieldValue.serverTimestamp(),
             });
 
             // Update lead record to track abandonment email

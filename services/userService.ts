@@ -9,6 +9,7 @@ import {
   query,
   orderBy,
   where,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { UserProfile, OnboardingStep } from '../types';
 
@@ -29,7 +30,7 @@ export const createProfile = async (sessionId: string, email?: string, postcode?
     onboarded: false,
     onboarding_step: OnboardingStep.WELCOME,
     children: [],
-    last_updated: Date.now(),
+    last_updated: serverTimestamp() as any,
     matching_eligible: false, // Default to false until onboarding is complete
   };
   const ref = doc(profilesCol, sessionId);
@@ -43,7 +44,7 @@ export const updateProfile = async (sessionId: string, updates: Partial<UserProf
   const updated: UserProfile = {
     ...existing,
     ...updates,
-    last_updated: Date.now(),
+    last_updated: serverTimestamp() as any,
   };
   const ref = doc(profilesCol, sessionId);
   await setDoc(ref, updated, { merge: true });
@@ -66,11 +67,11 @@ export const updateUserGroupAssignment = async (sessionId: string, groupId: stri
     const ref = doc(profilesCol, sessionId);
     const updates: Partial<UserProfile> = {
       group_id: groupId ?? undefined,
-      last_updated: Date.now(),
+      last_updated: serverTimestamp() as any,
     };
 
     if (groupId) {
-      updates.matched_at = Date.now();
+      updates.matched_at = serverTimestamp() as any;
     } else {
       updates.matched_at = undefined;
     }

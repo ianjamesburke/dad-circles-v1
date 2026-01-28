@@ -5,6 +5,52 @@ This file provides guidance to Coding Agents for working with code in this repos
 > [!CAUTION]
 > **CRITICAL SECURITY RULE**: NEVER commit API keys, secrets, or `.env` files to the repository. Always use `.env.example` as a template and ensure `.env` is in `.gitignore`.
 
+## Recent Architecture Changes
+
+### Timestamp Standardization (January 2025)
+**All timestamps now use Firestore server timestamps for consistency and security.**
+
+**Cloud Functions (functions/src/):**
+```typescript
+import { FieldValue } from 'firebase-admin/firestore';
+
+// Always use server timestamps
+await profileRef.update({
+  last_updated: FieldValue.serverTimestamp(),
+  abandonment_sent_at: FieldValue.serverTimestamp()
+});
+```
+
+**Client-Side Services (services/):**
+```typescript
+import { serverTimestamp } from 'firebase/firestore';
+
+// Use client SDK server timestamp
+const profile = {
+  last_updated: serverTimestamp() as any,
+  created_at: serverTimestamp() as any
+};
+```
+
+**Why Server Timestamps?**
+- Prevents client time manipulation
+- Ensures consistency across all users
+- Better for time-based queries and ordering
+- Single source of truth (server clock)
+
+**Type Definitions:**
+All timestamp fields in `types.ts` now use `any` type to support both Firestore Timestamp objects and legacy number values during migration.
+
+**Reading Timestamps:**
+```typescript
+// Convert Firestore Timestamp to milliseconds for comparisons
+const lastUpdated = profile.last_updated?.toMillis?.() || 0;
+const oneHourAgo = Date.now() - (60 * 60 * 1000);
+if (lastUpdated < oneHourAgo) {
+  // User is inactive
+}
+```
+
 ## Overview
 
 Dad Circles Onboarding MVP is a conversational onboarding application built with React and Gemini 2.0 Flash LLM. The application guides new and expecting dads through a structured onboarding flow while collecting relevant user information (status, children, interests, location). The backend uses Firebase (Firestore for data, Cloud Functions for email), and the frontend is a Vite-powered React app with a test persona system and admin monitoring dashboard.
@@ -123,32 +169,57 @@ npm run emulator:seed
 > 
 > When working with timestamps in Cloud Functions (`functions/src/`), follow these patterns:
 > 
-> 1. **For Client Timestamps**: Use `Date.now()` - returns milliseconds since epoch as a number
->    ```typescript
->    await db.collection('profiles').doc(id).update({
->      last_updated: Date.now()
->    });
->    ```
-> 
-> 2. **For Server Timestamps**: Import `FieldValue` from `firebase-admin/firestore` (NOT `admin.firestore.FieldValue`)
+> 1. **Always Use Server Timestamps**: Import `FieldValue` from `firebase-admin/firestore` (NOT `admin.firestore.FieldValue`)
 >    ```typescript
 >    import { FieldValue } from 'firebase-admin/firestore';
 >    
 >    await db.collection('profiles').doc(id).update({
+>      last_updated: FieldValue.serverTimestamp(),
 >      created_at: FieldValue.serverTimestamp()
 >    });
 >    ```
 > 
-> 3. **Why This Matters**:
+> 2. **Why This Matters**:
 >    - `admin.firestore.FieldValue` can be `undefined` in Firebase emulator contexts
 >    - Modern Firebase Admin SDK (v9+) uses modular imports
->    - `Date.now()` is simpler and works consistently everywhere
->    - Use server timestamps only when you need true server-side time (e.g., for security)
+>    - Server timestamps prevent client time manipulation
+>    - Ensures consistency across all users and time zones
 > 
-> 4. **Current Codebase Pattern**:
->    - Most of the codebase uses `Date.now()` for timestamps
->    - This is the preferred approach for consistency
->    - Only use `FieldValue.serverTimestamp()` if you have a specific reason (e.g., preventing client time manipulation)
+> 3. **Client-Side Timestamps**:
+>    - Use `serverTimestamp()` from `firebase/firestore` (client SDK)
+>    - Cast to `any` for type compatibility: `serverTimestamp() as any`
+> 
+> 4. **Reading Timestamps**:
+>    - Firestore Timestamps have `.toMillis()` method
+>    - Use optional chaining: `timestamp?.toMillis?.() || 0`
+>    - For comparisons, convert to milliseconds first
+
+### Logging Best Practices
+
+**Email Simulation Mode:**
+The email system has clear precedence for simulation vs real sending:
+
+1. **Force Simulation** (highest priority) - Explicit `forceSimulation` parameter
+2. **Emulator + Override** - `FUNCTIONS_EMULATOR=true` + `SEND_REAL_EMAILS=true` → sends real emails
+3. **Emulator Default** - `FUNCTIONS_EMULATOR=true` → simulates (logs only)
+4. **Missing API Key** - No `RESEND_API_KEY` → simulates with warning
+5. **Production** - Valid API key → sends real emails
+
+```bash
+# Local dev - simulate all emails (default)
+npm run emulator
+
+# Local dev - send real emails for testing
+SEND_REAL_EMAILS=true npm run emulator
+```
+
+**Location Lookup Failures:**
+When `getLocationFromPostcode()` fails, the system:
+- Logs a warning with postcode and context
+- Falls back to raw postcode in emails (acceptable degraded experience)
+- Continues email sending (non-blocking failure)
+
+Monitor logs for location lookup failures and consider caching successful lookups.
 
 ### Logging Best Practices
 
