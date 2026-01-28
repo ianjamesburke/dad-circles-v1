@@ -31,7 +31,7 @@ export class RateLimiter {
     const normalizedEmail = email.toLowerCase();
     const now = Date.now();
     
-    const docRef = db.collection(this.COLLECTION).doc(normalizedEmail);
+    const docRef = db.collection(this.COLLECTION).doc(encodeURIComponent(normalizedEmail));
     
     try {
       const result = await db.runTransaction(async (transaction) => {
