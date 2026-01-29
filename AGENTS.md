@@ -2,6 +2,9 @@
 
 This file provides guidance to Coding Agents for working with code in this repository.
 
+> [!IMPORTANT]
+> **DO NOT CREATE SUMMARY FILES**: Do not create markdown files to summarize your work, document your process, or track changes unless explicitly requested by the user. This includes files like SUMMARY.md, CHANGES.md, WORK_LOG.md, etc. Focus on code changes only.
+
 > [!CAUTION]
 > **CRITICAL SECURITY RULE**: NEVER commit API keys, secrets, or `.env` files to the repository. Always use `.env.example` as a template and ensure `.env` is in `.gitignore`.
 
