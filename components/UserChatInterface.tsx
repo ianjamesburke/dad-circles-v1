@@ -220,7 +220,8 @@ export const UserChatInterface: React.FC = () => {
         
         // Show a contextual fallback message to the user
         const fallbackMessage: Message = {
-          id: `temp-agent-${Date.now()}`,
+          id: `temp-agent-${crypto.randomUUID()}`,
+
           session_id: sessionId,
           role: Role.AGENT,
           content: fallbackContent,
