@@ -214,7 +214,7 @@ export const UserChatInterface: React.FC = () => {
             fallbackContent = "Does the information I showed you look correct? Please say 'yes' to confirm or tell me what needs to be changed.";
             break;
           default:
-            // TODO: This is the fallback for system errors, even and it shouldn't be. We should have like a technical difficulties catch-all. If truly everything breaks, but I keep getting this fallback response. 
+            // TODO: This is the fallback for system errors, but it shouldn't be. We should have a technical difficulties catch-all for when everything breaks.
             fallbackContent = "I need to make sure I have all your information correct. Let me ask you a few more questions to complete your profile.";
         }
         
