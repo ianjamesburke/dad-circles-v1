@@ -59,19 +59,21 @@ export const sendWelcomeEmail = onDocumentCreated(
     try {
       DebugLogger.info("📄 Extracting lead data from event");
       const leadData = event.data?.data();
-
-      DebugLogger.info("📊 Lead data extracted", {
-        hasData: !!leadData,
-        leadData: leadData
-      });
-
+      
+      
       if (!leadData) {
         DebugLogger.error("❌ No lead data found in document");
         logger.error("No lead data found in document");
         return;
       }
-
+      
       const { email, postcode, signupForOther } = leadData;
+
+      DebugLogger.info("📊 Lead data extracted", {
+        hasData: !!leadData,
+        email: maskEmail(email),
+        postcode: maskPostcode(postcode)
+      });
 
       DebugLogger.info("🔍 Validating required fields", {
         email: maskEmail(email),
