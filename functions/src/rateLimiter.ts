@@ -136,7 +136,7 @@ export class RateLimiter {
   static async resetEmail(email: string): Promise<void> {
     const db = admin.firestore();
     const normalizedEmail = email.toLowerCase();
-    await db.collection(this.COLLECTION).doc(normalizedEmail).delete();
+    await db.collection(this.COLLECTION).doc(encodeURIComponent(normalizedEmail)).delete();
     logger.info('Rate limit reset', { email: normalizedEmail });
   }
 }
