@@ -17,8 +17,8 @@ import { FieldValue } from "firebase-admin/firestore";
 import { logger, DebugLogger } from "./logger";
 import { EmailService, EMAIL_TEMPLATES } from "./emailService";
 import { getLocationFromPostcode, formatLocation } from "./utils/location";
-import { generateMagicLink } from "./utils/link";
-import { runDailyMatching } from "./matching";
+// import { generateMagicLink } from "./utils/link"; // Temporarily unused while abandonment cron is disabled
+// import { runDailyMatching } from "./matching"; // Temporarily unused while matching cron is disabled
 import { maskEmail, maskPostcode } from "./utils/pii";
 
 // Define secrets - these are automatically loaded from .env in emulator mode
@@ -300,7 +300,10 @@ export const testEmail = onSchedule(
  *
  * Scheduled to run daily at 9 AM UTC.
  * Scans all cities and runs matching for any city with >= 4 unmatched users in a bucket.
+ * 
+ * TEMPORARILY DISABLED - Use manual matching in Admin Dashboard instead
  */
+/*
 export const runDailyMatchingJob = onSchedule(
   {
     schedule: "0 9 * * *", // Daily at 9 AM UTC
@@ -318,6 +321,7 @@ export const runDailyMatchingJob = onSchedule(
     }
   }
 );
+*/
 
 /**
  * Abandonment Recovery Email Function
@@ -328,7 +332,10 @@ export const runDailyMatchingJob = onSchedule(
  * Note: last_updated tracks both profile changes AND user activity (messages).
  * This means users actively chatting won't receive abandonment emails (correct behavior).
  * The email is sent 1 hour after the user's last interaction.
+ * 
+ * TEMPORARILY DISABLED - Use manual trigger in Admin Dashboard instead
  */
+/*
 export const sendAbandonedOnboardingEmails = onSchedule(
   {
     schedule: "0 8-20 * * *",
@@ -448,4 +455,6 @@ export const sendAbandonedOnboardingEmails = onSchedule(
     }
   }
 );
+// End of commented out function
+*/
 
