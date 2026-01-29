@@ -30,6 +30,9 @@ export const sendRealEmails = defineSecret("SEND_REAL_EMAILS");
 // Export Callable Functions for Admin Dashboard
 export { runMatching, seedData, approveGroup, deleteGroup, sendMagicLink, sendCompletionEmail, sendManualAbandonmentEmail } from "./callable";
 
+// Export Gemini AI Function
+export { getGeminiResponse } from "./gemini";
+
 // Initialize Firebase Admin SDK
 admin.initializeApp();
 

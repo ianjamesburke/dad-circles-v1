@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { db } from '../store';
-import { getAgentResponse } from '../services/geminiService';
+import { getAgentResponse } from '../services/callableGeminiService';
 import { Role, Message, OnboardingStep } from '../types';
 import { validateLLMResponse, logValidationFailure } from '../services/onboardingValidator';
 

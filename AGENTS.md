@@ -7,6 +7,39 @@ This file provides guidance to Coding Agents for working with code in this repos
 
 ## Recent Architecture Changes
 
+**NEW ARCHITECTURE**:
+```
+Client → Cloud Function (getGeminiResponse) → Gemini API
+```
+
+**Implementation**:
+- **Backend**: `functions/src/gemini.ts` - Secure Cloud Function with API key in Firebase Secrets
+- **Client**: `services/callableGeminiService.ts` - Calls the Cloud Function via `httpsCallable`
+- **Deprecated**: `services/geminiService.ts` - Old insecure implementation (DO NOT USE)
+
+**Local Development Setup**:
+```bash
+# Create secret file for emulators
+echo "GEMINI_API_KEY=your_key" > functions/.secret.local
+
+# Or use the setup script
+./scripts/setup-gemini-secret.sh
+```
+
+**Production Setup**:
+```bash
+# Store in Firebase Secrets (one-time)
+firebase functions:secrets:set GEMINI_API_KEY
+```
+
+**Key Benefits**:
+- API key never exposed to client
+- Server-side rate limiting possible
+- Audit trail for all API calls
+- Centralized cost control
+
+See `docs/GEMINI_API_SECURITY.md` for complete documentation.
+
 ### Timestamp Standardization (January 2025)
 **All timestamps now use Firestore server timestamps for consistency and security.**
 
