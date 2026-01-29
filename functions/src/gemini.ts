@@ -334,8 +334,8 @@ export const getGeminiResponse = onCall(
       if (!msg.role || !msg.content) {
         throw new HttpsError('invalid-argument', 'invalid message format in history');
       }
-      if (typeof msg.content !== 'string' || msg.content.length > 10000) {
-        throw new HttpsError('invalid-argument', 'message content too large (max 10000 chars)');
+      if (typeof msg.content !== 'string' || msg.content.length > 1000) {
+        throw new HttpsError('invalid-argument', 'Message too long. Please keep your message under 1000 characters.');
       }
     }
 
