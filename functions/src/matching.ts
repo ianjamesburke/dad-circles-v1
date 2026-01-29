@@ -23,8 +23,8 @@ interface UserProfile {
     state_code: string;
   };
   children: Array<{
-    type: 'expecting' | 'existing';
-    birth_month: number;
+    type?: 'expecting' | 'existing'; // Deprecated - inferred from date
+    birth_month?: number;
     birth_year: number;
     gender?: string;
   }>;
@@ -83,19 +83,36 @@ const DEFAULT_CONFIG: MatchingConfig = {
 };
 
 /**
+ * Helper to determine if a child is expecting (not yet born) based on date
+ */
+function isChildExpecting(child: { birth_month?: number; birth_year: number }): boolean {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  if (child.birth_year > currentYear) return true;
+  if (child.birth_year === currentYear) {
+    if (!child.birth_month) return false;
+    return child.birth_month > currentMonth;
+  }
+  return false;
+}
+
+/**
  * Helper function to determine life stage from user profile
  */
 function getLifeStageFromUser(user: UserProfile): LifeStage | null {
   if (!user.children || user.children.length === 0) return null;
 
   const primaryChild = user.children[0];
+  
+  if (isChildExpecting(primaryChild)) {
+    return LifeStage.EXPECTING;
+  }
+
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
-
-  if (primaryChild.type === 'expecting') {
-    return LifeStage.EXPECTING;
-  }
 
   const birthYear = primaryChild.birth_year;
   const birthMonth = primaryChild.birth_month ?? 6; // Default to mid-year if month not provided
@@ -276,7 +293,7 @@ export async function sendGroupIntroductionEmails(
           let childInfo = 'Dad';
           if (userData.children && userData.children.length > 0) {
             const child = userData.children[0];
-            if (child.type === 'expecting') {
+            if (isChildExpecting(child)) {
               const dateStr = child.birth_month ? `${child.birth_month}/${child.birth_year}` : `${child.birth_year}`;
               childInfo = `Expecting ${dateStr}`;
             } else {

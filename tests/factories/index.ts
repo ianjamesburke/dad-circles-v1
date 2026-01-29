@@ -84,14 +84,13 @@ export function createConversation(turns: number, sessionId = 'test-session'): M
 }
 
 /**
- * Create a test child
+ * Create a test child (birth date in past = existing)
  */
 export function createChild(overrides: Partial<Child> = {}): Child {
   const now = new Date();
   return {
-    type: 'existing',
     birth_month: now.getMonth() + 1,
-    birth_year: now.getFullYear(),
+    birth_year: now.getFullYear() - 1, // Default to 1 year ago
     ...overrides,
   };
 }
@@ -103,7 +102,6 @@ export function createExpectingChild(monthsFromNow = 3): Child {
   const dueDate = new Date();
   dueDate.setMonth(dueDate.getMonth() + monthsFromNow);
   return {
-    type: 'expecting',
     birth_month: dueDate.getMonth() + 1,
     birth_year: dueDate.getFullYear(),
   };
@@ -116,7 +114,6 @@ export function createChildWithAge(ageInMonths: number): Child {
   const birthDate = new Date();
   birthDate.setMonth(birthDate.getMonth() - ageInMonths);
   return {
-    type: 'existing',
     birth_month: birthDate.getMonth() + 1,
     birth_year: birthDate.getFullYear(),
   };

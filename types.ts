@@ -17,7 +17,7 @@ export enum Role {
 }
 
 export interface Child {
-  type: 'expecting' | 'existing';
+  type?: 'expecting' | 'existing'; // Deprecated - use isExpecting() helper instead. Kept for backwards compatibility.
   birth_month?: number; // Optional - some users only provide year
   birth_year: number;
   gender?: string;

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { database } from '../../database';
 import { UserProfile, Message, Role, Group } from '../../types';
-import { formatChildDate } from '../../utils/childDisplay';
+import { formatChildDate, isExpecting } from '../../utils/childDisplay';
 
 export const AdminUserDetail: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -201,13 +201,13 @@ export const AdminUserDetail: React.FC = () => {
                 {profile.children.map((child, idx) => (
                   <div key={idx} className="bg-slate-800 rounded-lg p-3">
                     <div className="flex items-center gap-2 mb-2">
-                      <i className={`fas ${child.type === 'expecting' ? 'fa-baby-carriage' : 'fa-baby'} text-blue-400`}></i>
+                      <i className={`fas ${isExpecting(child) ? 'fa-baby-carriage' : 'fa-baby'} text-blue-400`}></i>
                       <span className="text-white font-medium">
-                        {child.type === 'expecting' ? 'Expecting' : 'Child'}
+                        {isExpecting(child) ? 'Expecting' : 'Child'}
                       </span>
                     </div>
                     <p className="text-slate-400 text-sm">
-                      {child.type === 'expecting' ? 'Due' : 'Born'}: {formatChildDate(child)}
+                      {isExpecting(child) ? 'Due' : 'Born'}: {formatChildDate(child)}
                     </p>
                     {child.gender && (
                       <p className="text-slate-400 text-sm">Gender: {child.gender}</p>

@@ -73,16 +73,15 @@ describe('LifeStage Enum', () => {
 
 describe('Type Structures', () => {
   describe('Child type', () => {
-    it('should accept expecting type', () => {
+    it('should accept child without type (inferred from date)', () => {
       const child = {
-        type: 'expecting' as const,
         birth_month: 6,
         birth_year: 2026,
       };
-      expect(child.type).toBe('expecting');
+      expect(child.birth_year).toBe(2026);
     });
 
-    it('should accept existing type', () => {
+    it('should accept optional type for backwards compatibility', () => {
       const child = {
         type: 'existing' as const,
         birth_month: 3,
@@ -93,7 +92,6 @@ describe('Type Structures', () => {
 
     it('should accept optional gender', () => {
       const child = {
-        type: 'existing' as const,
         birth_month: 3,
         birth_year: 2024,
         gender: 'boy',

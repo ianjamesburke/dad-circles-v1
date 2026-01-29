@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { database } from '../../database';
 import { Group, UserProfile } from '../../types';
-import { formatChildDate } from '../../utils/childDisplay';
+import { formatChildDate, isExpecting } from '../../utils/childDisplay';
 
 export const AdminGroupDetail: React.FC = () => {
   const { groupId } = useParams<{ groupId: string }>();
@@ -73,7 +73,7 @@ export const AdminGroupDetail: React.FC = () => {
         const birthMonth = child.birth_month ?? 6; // Default to mid-year if month not provided
         return {
           date: new Date(child.birth_year, birthMonth - 1),
-          type: child.type,
+          isExpecting: isExpecting(child),
           member: m,
         };
       })
@@ -196,14 +196,14 @@ export const AdminGroupDetail: React.FC = () => {
                 <div>
                   <p className="text-slate-400">Oldest child</p>
                   <p className="text-white">
-                    {ageGap.oldest.type === 'expecting' ? 'Due' : 'Born'}{' '}
+                    {ageGap.oldest.isExpecting ? 'Due' : 'Born'}{' '}
                     {ageGap.oldest.date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
                   </p>
                 </div>
                 <div>
                   <p className="text-slate-400">Youngest child</p>
                   <p className="text-white">
-                    {ageGap.youngest.type === 'expecting' ? 'Due' : 'Born'}{' '}
+                    {ageGap.youngest.isExpecting ? 'Due' : 'Born'}{' '}
                     {ageGap.youngest.date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
                   </p>
                 </div>
@@ -281,8 +281,7 @@ export const AdminGroupDetail: React.FC = () => {
                             key={idx}
                             className="bg-slate-800 text-slate-400 px-2 py-1 rounded text-xs"
                           >
-                            {child.type === 'expecting' ? '🤰' : '👶'}{' '}
-                            {child.type === 'expecting' ? 'Due' : 'Born'} {formatChildDate(child)}
+                            {isExpecting(child) ? '🤰 Due' : '👶 Born'} {formatChildDate(child)}
                           </span>
                         ))}
                       </div>
