@@ -401,8 +401,11 @@ export const sendAbandonedOnboardingEmails = onSchedule(
           const success = await EmailService.sendTemplateEmail(emailTemplate);
 
           if (success) {
+            // Use batch write for atomic updates to profile and lead
+            const batch = db.batch();
+
             // Update profile
-            await doc.ref.update({
+            batch.update(doc.ref, {
               abandonment_sent: true,
               abandonment_sent_at: FieldValue.serverTimestamp(),
             });
@@ -414,12 +417,15 @@ export const sendAbandonedOnboardingEmails = onSchedule(
             const leadSnap = await leadQuery.get();
 
             if (!leadSnap.empty) {
-              await leadSnap.docs[0].ref.update({
+              batch.update(leadSnap.docs[0].ref, {
                 abandonmentEmailSent: true,
                 abandonmentEmailSentAt: FieldValue.serverTimestamp(),
                 last_communication_at: FieldValue.serverTimestamp(), // Track for follow-up emails
               });
             }
+
+            // Commit all updates atomically
+            await batch.commit();
 
             emailsSent++;
 

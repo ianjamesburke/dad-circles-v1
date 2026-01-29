@@ -186,8 +186,11 @@ export const sendCompletionEmail = onCall(
   const success = await EmailService.sendTemplateEmail(emailTemplate);
 
   if (success) {
+    // Use batch write for atomic updates to profile and lead
+    const batch = db.batch();
+
     // Update profile
-    await profileRef.update({
+    batch.update(profileRef, {
       welcomeEmailSent: true,
       welcomeEmailSentAt: FieldValue.serverTimestamp(),
     });
@@ -199,13 +202,16 @@ export const sendCompletionEmail = onCall(
     const leadSnap = await leadQuery.get();
 
     if (!leadSnap.empty) {
-      await leadSnap.docs[0].ref.update({
+      batch.update(leadSnap.docs[0].ref, {
         welcomeEmailSent: true,
         welcomeEmailSentAt: FieldValue.serverTimestamp(),
         welcomeEmailPending: false,
         last_communication_at: FieldValue.serverTimestamp(), // Track for follow-up emails
       });
     }
+
+    // Commit all updates atomically
+    await batch.commit();
   }
 
   return { success };
