@@ -30,7 +30,7 @@ export const EMAIL_TEMPLATES = {
 } as const;
 
 export class EmailService {
-  private static readonly DEFAULT_FROM = "Circle <circle@mail.dadcircles.com>";
+  private static readonly DEFAULT_FROM = "DadCircles <info@mail.dadcircles.com>";
   
   /**
    * Initialize Resend client lazily
