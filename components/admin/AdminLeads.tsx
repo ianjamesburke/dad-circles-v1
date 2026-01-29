@@ -228,7 +228,7 @@ export const AdminLeads: React.FC = () => {
                     </td>
                     <td className="px-4 py-4">
                       <span className="text-slate-500 text-sm">
-                        {new Date(lead.timestamp).toLocaleDateString()}
+                        {new Date(lead.timestamp?.toMillis?.() || lead.timestamp || 0).toLocaleDateString()}
                       </span>
                     </td>
                   </tr>

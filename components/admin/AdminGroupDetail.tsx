@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { database } from '../../database';
 import { Group, UserProfile } from '../../types';
+import { formatChildDate } from '../../utils/childDisplay';
 
 export const AdminGroupDetail: React.FC = () => {
   const { groupId } = useParams<{ groupId: string }>();
@@ -69,8 +70,9 @@ export const AdminGroupDetail: React.FC = () => {
       .filter(m => m.children && m.children.length > 0)
       .map(m => {
         const child = m.children[0];
+        const birthMonth = child.birth_month ?? 6; // Default to mid-year if month not provided
         return {
-          date: new Date(child.birth_year, child.birth_month - 1),
+          date: new Date(child.birth_year, birthMonth - 1),
           type: child.type,
           member: m,
         };
@@ -167,12 +169,12 @@ export const AdminGroupDetail: React.FC = () => {
               </div>
               <div>
                 <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Created</p>
-                <p className="text-white">{new Date(group.created_at).toLocaleString()}</p>
+                <p className="text-white">{new Date(group.created_at?.toMillis?.() || group.created_at || 0).toLocaleString()}</p>
               </div>
               {group.introduction_email_sent_at && (
                 <div>
                   <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Emails Sent</p>
-                  <p className="text-white">{new Date(group.introduction_email_sent_at).toLocaleString()}</p>
+                  <p className="text-white">{new Date(group.introduction_email_sent_at?.toMillis?.() || group.introduction_email_sent_at || 0).toLocaleString()}</p>
                 </div>
               )}
             </div>
@@ -280,7 +282,7 @@ export const AdminGroupDetail: React.FC = () => {
                             className="bg-slate-800 text-slate-400 px-2 py-1 rounded text-xs"
                           >
                             {child.type === 'expecting' ? '🤰' : '👶'}{' '}
-                            {child.type === 'expecting' ? 'Due' : 'Born'} {child.birth_month}/{child.birth_year}
+                            {child.type === 'expecting' ? 'Due' : 'Born'} {formatChildDate(child)}
                           </span>
                         ))}
                       </div>

@@ -16,7 +16,7 @@ export function getLifeStageFromUser(user: UserProfile): LifeStage | null {
 
   // Calculate age in months
   const birthYear = primaryChild.birth_year;
-  const birthMonth = primaryChild.birth_month;
+  const birthMonth = primaryChild.birth_month ?? 6; // Default to mid-year if month not provided
   const ageInMonths = (currentYear - birthYear) * 12 + (currentMonth - birthMonth);
 
   if (ageInMonths <= 6) {

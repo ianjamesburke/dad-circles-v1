@@ -36,7 +36,8 @@ export const validateProfileCompleteness = (profile: UserProfile): ValidationRes
       if (!child.type || (child.type !== 'expecting' && child.type !== 'existing')) {
         errors.push(`Child ${index + 1}: Invalid type`);
       }
-      if (!child.birth_month || child.birth_month < 1 || child.birth_month > 12) {
+      // birth_month is optional, but if provided must be valid
+      if (child.birth_month !== undefined && (child.birth_month < 1 || child.birth_month > 12)) {
         errors.push(`Child ${index + 1}: Invalid birth month`);
       }
       if (!child.birth_year || child.birth_year < 2020 || child.birth_year > 2030) {

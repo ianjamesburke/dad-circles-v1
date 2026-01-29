@@ -63,14 +63,20 @@ welcome: Greet the user warmly and ask for their first name.
 name: Capture the user's first name and then ask if they are an expecting dad or a current dad.
 status: Confirm whether expecting or current dad (if not already known).
 child_info: 
-  - If expecting: Ask due month and year only.
-  - If current dad: Ask birth month and year.
+  - If expecting: Ask due month and year (month is optional if user only knows year).
+  - If current dad: Ask birth month and year (month is optional if user only knows year).
+  - AGE-BASED RESPONSES: If user says "he's 2" or "she's 5 months old", calculate birth date:
+    * "He's 2" or "2 years old" = Subtract 2 years from current date, use current month (or omit month if uncertain)
+    * "She's 6 months" = Subtract 6 months from current date
+    * Example: User says "he's 2" in January 2026 = birth_month: 1, birth_year: 2024
+    * If user only provides year (e.g., "born in 2024"), omit birth_month
+    * ALWAYS validate: birth_year must be between 2020-2030, birth_month (if provided) must be 1-12
   - Optionally ask gender after timeline is known.
   - IMPORTANT: If user mentions MULTIPLE children, capture ALL of them in the children array.
   - MULTIPLE CHILDREN EXAMPLES:
     * "I have two kids, one born March 2023 and another due January 2026" = 
       children: [{"type": "existing", "birth_month": 3, "birth_year": 2023}, {"type": "expecting", "birth_month": 1, "birth_year": 2026}]
-    * "My children are 5 and 2 years old" = Ask for specific birth dates, then capture both
+    * "My children are 5 and 2 years old" = Calculate birth dates for both, then capture both
     * "I only have two children! They are born March 2023, and Jan 2026" = 
       children: [{"type": "existing", "birth_month": 3, "birth_year": 2023}, {"type": "existing", "birth_month": 1, "birth_year": 2026}]
   - SMART FLOW: ONLY skip siblings step if user explicitly says "only one", "just one", "I only have one", "my only child", "no other kids", etc.
@@ -212,6 +218,12 @@ CRITICAL:
 - NO thinking, reasoning, or explanation
 - Extract gender from context (her/she = Girl, him/he = Boy)
 - For confirmations, use actual newline characters in your message - NEVER use HTML tags like <br> or <br/>
+- AGE CALCULATION: When user says "he's X years old" or "she's Y months old":
+  * Calculate birth date by subtracting from current date (${getCurrentDateContext().split('\n')[0]})
+  * "He's 2" in January 2026 = birth_year: 2024, birth_month: 1 (or omit month if uncertain)
+  * "She's 6 months" in January 2026 = birth_month: 7, birth_year: 2025
+  * If user only provides year (e.g., "born in 2024"), omit birth_month field entirely
+  * ALWAYS ensure birth_year is 2020-2030 and birth_month (if provided) is 1-12
 - MULTIPLE CHILDREN PARSING: When user mentions multiple children with dates, create separate child objects for EACH ONE
   * "March 2023 and Jan 2026" = TWO separate children entries
   * "5 years old and 2 years old" = TWO separate children entries  
@@ -220,7 +232,7 @@ CRITICAL:
 - MULTIPLE CHILDREN: If user mentions multiple kids, create separate entries for each
 - MULTIPLE CHILDREN PARSING EXAMPLES:
   * "I have two children born March 2023 and Jan 2026" = children: [{"type": "existing", "birth_month": 3, "birth_year": 2023}, {"type": "existing", "birth_month": 1, "birth_year": 2026}]
-  * "One is 5 years old, another is 2" = Ask for birth months/years, then create separate entries
+  * "One is 5 years old, another is 2" = Calculate birth dates, then create separate entries
   * "My kids are due June 2025 and I have a 3-year-old" = Mix of expecting and existing children
 - SMART FLOW: ONLY set next_step to "interests" (skip siblings) if user explicitly says "only one", "just one", "I only have one", "no other kids", "this is my only child"
 - IMPORTANT: "I only have two children" or "I only have three children" means they are telling you ALL their children - capture them all and skip siblings
@@ -717,7 +729,8 @@ const createFallbackResponse = (profile: UserProfile, history: Message[]) => {
           const childName = (child as any).name || '';
           const namePrefix = childName ? `${childName} ` : '';
           const typePrefix = child.type === 'expecting' ? 'Expecting ' : '';
-          return `${namePrefix}${typePrefix}${child.birth_month}/${child.birth_year}${child.gender ? `, ${child.gender}` : ''}`;
+          const dateStr = child.birth_month ? `${child.birth_month}/${child.birth_year}` : `${child.birth_year}`;
+          return `${namePrefix}${typePrefix}${dateStr}${child.gender ? `, ${child.gender}` : ''}`;
         }).join(', ') :
         'Not specified';
 

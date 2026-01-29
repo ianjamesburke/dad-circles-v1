@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { database } from '../database';
 import { UserProfile, Message, Role, Lead, Group, MatchingStats } from '../types';
+import { formatChildInfoWithGender } from '../utils/childDisplay';
 
 export const AdminDashboard: React.FC = () => {
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
@@ -291,10 +292,7 @@ export const AdminDashboard: React.FC = () => {
                           {p.children.map((child, index) => (
                             <div key={index} className="text-xs text-slate-600 flex items-center gap-1.5">
                               <i className="fas fa-baby text-[10px] opacity-60"></i>
-                              {child.type === 'expecting'
-                                ? `Expecting ${child.birth_month}/${child.birth_year}${child.gender ? `, ${child.gender}` : ''}`
-                                : `Child born ${child.birth_month}/${child.birth_year}${child.gender ? `, ${child.gender}` : ''}`
-                              }
+                              {formatChildInfoWithGender(child)}
                             </div>
                           ))}
                         </div>
@@ -321,7 +319,7 @@ export const AdminDashboard: React.FC = () => {
                     </div>
 
                     <div className="text-[10px] text-slate-400 mt-2 flex justify-between">
-                      <span>Updated {new Date(p.last_updated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span>Updated {new Date(p.last_updated?.toMillis?.() || p.last_updated || 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       <i className="fas fa-chevron-right opacity-0 group-hover:opacity-100 transition-opacity"></i>
                     </div>
                   </button>
@@ -370,7 +368,7 @@ export const AdminDashboard: React.FC = () => {
                         <div className="flex gap-2 items-center mb-1 opacity-60 text-[10px] font-bold uppercase tracking-wider">
                           <span>{m.role}</span>
                           <span>&bull;</span>
-                          <span className="font-normal">{new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span className="font-normal">{new Date(m.timestamp?.toMillis?.() || m.timestamp || 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                         {m.content}
                       </div>
@@ -463,10 +461,10 @@ export const AdminDashboard: React.FC = () => {
                       </div>
                       <div className="text-right">
                         <div className="text-xs text-slate-400">
-                          {new Date(lead.timestamp).toLocaleDateString()}
+                          {new Date(lead.timestamp?.toMillis?.() || lead.timestamp || 0).toLocaleDateString()}
                         </div>
                         <div className="text-xs text-slate-400">
-                          {new Date(lead.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(lead.timestamp?.toMillis?.() || lead.timestamp || 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       </div>
                     </div>
@@ -700,7 +698,7 @@ export const AdminDashboard: React.FC = () => {
                         </div>
                         <div className="text-right">
                           <div className="text-xs text-slate-400">
-                            {new Date(group.created_at).toLocaleDateString()}
+                            {new Date(group.created_at?.toMillis?.() || group.created_at || 0).toLocaleDateString()}
                           </div>
                         </div>
                       </div>

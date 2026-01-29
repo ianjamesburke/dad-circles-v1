@@ -60,7 +60,7 @@ const BlogPage: React.FC = () => {
                                 </div>
                                 <div style={styles.blogContent}>
                                     <div style={styles.blogMeta}>
-                                        <span>{new Date(post.published_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                                        <span>{new Date(post.published_at?.toMillis?.() || post.published_at || 0).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
                                         <span>•</span>
                                         <span>{post.read_time_minutes} min read</span>
                                     </div>

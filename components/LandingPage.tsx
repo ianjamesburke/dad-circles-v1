@@ -420,7 +420,7 @@ const LandingPage: React.FC = () => {
                   <img src={post.cover_image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <div style={styles.blogContent}>
-                  <span style={styles.blogDate}>{new Date(post.published_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                  <span style={styles.blogDate}>{new Date(post.published_at?.toMillis?.() || post.published_at || 0).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
                   <h4 style={styles.blogTitle}>{post.title}</h4>
                   <p style={styles.blogExcerpt}>{post.excerpt}</p>
                 </div>

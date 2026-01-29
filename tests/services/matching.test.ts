@@ -32,7 +32,7 @@ function calculateDueDateScore(birthMonth: number, birthYear: number): number {
   return dueDate.getTime() - now.getTime();
 }
 
-function getLifeStageFromChild(child: { type: string; birth_month: number; birth_year: number }): LifeStage | null {
+function getLifeStageFromChild(child: { type: string; birth_month?: number; birth_year: number }): LifeStage | null {
   if (child.type === 'expecting') {
     return LifeStage.EXPECTING;
   }
@@ -51,7 +51,7 @@ function getLifeStageFromChild(child: { type: string; birth_month: number; birth
 }
 
 function validateAgeGap(
-  users: Array<{ children: Array<{ type: string; birth_month: number; birth_year: number }> }>,
+  users: Array<{ children: Array<{ type: string; birth_month?: number; birth_year: number }> }>,
   lifeStage: LifeStage,
   maxGapMonths: number
 ): boolean {
