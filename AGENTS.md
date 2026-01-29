@@ -194,7 +194,7 @@ npm run emulator:seed
 >    - Use optional chaining: `timestamp?.toMillis?.() || 0`
 >    - For comparisons, convert to milliseconds first
 
-### Logging Best Practices
+### System Behavior Notes
 
 **Email Simulation Mode:**
 The email system has clear precedence for simulation vs real sending:
