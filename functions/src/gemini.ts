@@ -322,6 +322,23 @@ export const getGeminiResponse = onCall(
       throw new HttpsError('invalid-argument', 'session_id is required');
     }
 
+    // Validate input size to prevent abuse and resource exhaustion
+    if (!Array.isArray(history)) {
+      throw new HttpsError('invalid-argument', 'history must be an array');
+    }
+    if (history.length > 50) {
+      throw new HttpsError('invalid-argument', 'history too long (max 50 messages)');
+    }
+    // Validate each message in history
+    for (const msg of history) {
+      if (!msg.role || !msg.content) {
+        throw new HttpsError('invalid-argument', 'invalid message format in history');
+      }
+      if (typeof msg.content !== 'string' || msg.content.length > 10000) {
+        throw new HttpsError('invalid-argument', 'message content too large (max 10000 chars)');
+      }
+    }
+
     // Check rate limit
     const rateLimitCheck = await RateLimiter.checkGeminiRequest(profile.session_id);
     if (!rateLimitCheck.allowed) {
