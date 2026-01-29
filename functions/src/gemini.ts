@@ -8,6 +8,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import { logger } from "./logger";
+import { RateLimiter } from "./rateLimiter";
 import { GoogleGenAI, FunctionCallingConfigMode, Type, ThinkingLevel } from '@google/genai';
 import type { FunctionDeclaration, Content } from '@google/genai';
 
@@ -314,6 +315,21 @@ export const getGeminiResponse = onCall(
 
     if (!profile || !history) {
       throw new HttpsError('invalid-argument', 'profile and history are required');
+    }
+
+    // Validate session_id exists for rate limiting
+    if (!profile.session_id) {
+      throw new HttpsError('invalid-argument', 'session_id is required');
+    }
+
+    // Check rate limit
+    const rateLimitCheck = await RateLimiter.checkGeminiRequest(profile.session_id);
+    if (!rateLimitCheck.allowed) {
+      logger.warn('Gemini request rate limited', { 
+        sessionId: profile.session_id,
+        reason: rateLimitCheck.reason 
+      });
+      throw new HttpsError('resource-exhausted', rateLimitCheck.reason || 'Rate limit exceeded');
     }
 
     logger.info('Gemini request received', { 
