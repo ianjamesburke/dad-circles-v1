@@ -496,7 +496,7 @@ const LandingPage: React.FC = () => {
                       <i className="fab fa-twitter" style={{ width: '20px' }}></i> Twitter
                     </a>
                     <a
-                      href={`mailto:?subject=Check out DadCircles&body=I found something called DadCircles. It matches local Dads and makes it easy to meet up. Thought of you. Want an invite? https://dadcircles.com`}
+                      href={`mailto:?subject=${encodeURIComponent('Check out DadCircles')}&body=${encodeURIComponent('I found something called DadCircles. It matches local Dads and makes it easy to meet up. Thought of you. Want an invite? https://dadcircles.com')}`}
                       onClick={() => {
                         setShowShareDropdown(false);
                       }}
