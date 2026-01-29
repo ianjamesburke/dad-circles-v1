@@ -19,6 +19,7 @@ import { EmailService, EMAIL_TEMPLATES } from "./emailService";
 import { getLocationFromPostcode, formatLocation } from "./utils/location";
 import { generateMagicLink } from "./utils/link";
 import { runDailyMatching } from "./matching";
+import { maskEmail, maskPostcode } from "./utils/pii";
 
 // Define secrets - these are automatically loaded from .env in emulator mode
 // and from Cloud Secret Manager in production
@@ -73,28 +74,36 @@ export const sendWelcomeEmail = onDocumentCreated(
       const { email, postcode, signupForOther } = leadData;
 
       DebugLogger.info("🔍 Validating required fields", {
-        email: email,
-        postcode: postcode,
+        email: maskEmail(email),
+        postcode: maskPostcode(postcode),
         signupForOther: signupForOther,
         hasEmail: !!email,
         hasPostcode: !!postcode
       });
 
       if (!email || !postcode) {
-        DebugLogger.error("❌ Missing required fields", { email, postcode });
-        logger.error("Missing required fields", { email, postcode });
+        DebugLogger.error("❌ Missing required fields", { 
+          email: maskEmail(email), 
+          postcode: maskPostcode(postcode) 
+        });
+        logger.error("Missing required fields", { 
+          email: maskEmail(email), 
+          postcode: maskPostcode(postcode) 
+        });
         return;
       }
 
       // If signing up for someone else, send immediate email
       if (signupForOther) {
-        DebugLogger.info("📧 Sending immediate email for 'signup for other'", { email });
+        DebugLogger.info("📧 Sending immediate email for 'signup for other'", { 
+          email: maskEmail(email) 
+        });
         
         const locationInfo = await getLocationFromPostcode(postcode);
         if (!locationInfo) {
           logger.warn("⚠️ Location lookup failed, using postcode fallback", {
-            postcode: postcode,
-            email: email
+            postcode: maskPostcode(postcode),
+            email: maskEmail(email)
           });
         }
         const locationString = locationInfo
@@ -194,8 +203,8 @@ export const sendFollowUpEmails = onSchedule(
           const locationInfo = await getLocationFromPostcode(postcode);
           if (!locationInfo) {
             logger.warn("⚠️ Location lookup failed, using postcode fallback", {
-              postcode: postcode,
-              email: email,
+              postcode: maskPostcode(postcode),
+              email: maskEmail(email),
               leadId: doc.id
             });
           }
@@ -220,7 +229,7 @@ export const sendFollowUpEmails = onSchedule(
 
             logger.info("Follow-up email sent", {
               leadId: doc.id,
-              email,
+              email: maskEmail(email),
             });
           } else {
             // Mark as failed
@@ -232,7 +241,7 @@ export const sendFollowUpEmails = onSchedule(
 
             logger.error("Follow-up email failed", {
               leadId: doc.id,
-              email,
+              email: maskEmail(email),
             });
           }
         } catch (error) {
@@ -371,7 +380,7 @@ export const sendAbandonedOnboardingEmails = onSchedule(
           const locationInfo = await getLocationFromPostcode(profile.postcode);
           if (!locationInfo) {
             logger.warn("⚠️ Location lookup failed, using postcode fallback", {
-              postcode: profile.postcode,
+              postcode: maskPostcode(profile.postcode),
               session_id: profile.session_id
             });
           }
@@ -416,7 +425,7 @@ export const sendAbandonedOnboardingEmails = onSchedule(
 
             logger.info("✅ Abandonment email sent", {
               session_id: profile.session_id,
-              email: profile.email,
+              email: maskEmail(profile.email),
             });
           }
         } catch (error) {

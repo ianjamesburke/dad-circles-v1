@@ -7,6 +7,7 @@
 
 import * as admin from 'firebase-admin';
 import { logger } from './logger';
+import { maskEmail } from './utils/pii';
 
 interface RateLimitRecord {
   email: string;
@@ -54,7 +55,10 @@ export class RateLimiter {
         // Check if currently blocked
         if (record.blockedUntil && record.blockedUntil > now) {
           const minutesLeft = Math.ceil((record.blockedUntil - now) / 60000);
-          logger.warn('Rate limit block active', { email: normalizedEmail, minutesLeft });
+          logger.warn('Rate limit block active', { 
+            email: maskEmail(normalizedEmail), 
+            minutesLeft 
+          });
           return { 
             allowed: false, 
             reason: `Too many requests. Please try again in ${minutesLeft} minute${minutesLeft > 1 ? 's' : ''}.` 
@@ -85,7 +89,7 @@ export class RateLimiter {
           transaction.set(docRef, updatedRecord);
           
           logger.warn('Rate limit exceeded - blocking email', { 
-            email: normalizedEmail, 
+            email: maskEmail(normalizedEmail), 
             attempts: record.attempts + 1 
           });
           
@@ -108,7 +112,10 @@ export class RateLimiter {
       
       return result;
     } catch (error) {
-      logger.error('Rate limiter error', { email: normalizedEmail, error });
+      logger.error('Rate limiter error', { 
+        email: maskEmail(normalizedEmail), 
+        error 
+      });
       
       // SECURITY: Fail-closed approach
       // We prioritize security over availability. If the rate limiter encounters an error,
@@ -136,7 +143,7 @@ export class RateLimiter {
   static async resetEmail(email: string): Promise<void> {
     const db = admin.firestore();
     const normalizedEmail = email.toLowerCase();
-    await db.collection(this.COLLECTION).doc(encodeURIComponent(normalizedEmail)).delete();
-    logger.info('Rate limit reset', { email: normalizedEmail });
+    await db.collection(this.COLLECTION).doc(normalizedEmail).delete();
+    logger.info('Rate limit reset', { email: maskEmail(normalizedEmail) });
   }
 }

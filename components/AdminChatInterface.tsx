@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../store';
 import { getAgentResponse } from '../services/geminiService';
 import { Role, Message, OnboardingStep } from '../types';
+import { validateLLMResponse, logValidationFailure } from '../services/onboardingValidator';
 
 /**
  * AdminChatInterface - Testing tool for admins/developers
@@ -132,6 +133,36 @@ export const AdminChatInterface: React.FC = () => {
       const history = await db.getMessages(sessionId);
       
       const result = await getAgentResponse(profile, history);
+
+      // SECURITY: Validate LLM response before applying state changes
+      const validation = validateLLMResponse(
+        profile,
+        result.next_step as OnboardingStep,
+        result.profile_updates
+      );
+
+      if (!validation.isValid) {
+        // Log security event
+        logValidationFailure(
+          sessionId,
+          profile.onboarding_step,
+          result.next_step as OnboardingStep,
+          validation.errors
+        );
+
+        // Reject the transition and show fallback message
+        console.error('🚨 [SECURITY] Invalid state transition blocked:', validation.errors);
+        
+        await db.addMessage({
+          session_id: sessionId,
+          role: Role.AGENT,
+          content: "I need to make sure I have all your information correct. Let me ask you a few more questions to complete your profile."
+        });
+
+        await loadMessages(sessionId);
+        setLoading(false);
+        return; // Stop processing this response
+      }
 
       if (result.profile_updates) {
         await db.updateProfile(sessionId, result.profile_updates);

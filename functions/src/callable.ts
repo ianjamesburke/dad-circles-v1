@@ -8,6 +8,7 @@ import { getLocationFromPostcode, formatLocation } from './utils/location';
 import { generateMagicLink } from "./utils/link";
 import { runMatchingAlgorithm, seedTestData, approveAndEmailGroup, deleteGroup as deleteGroupLogic } from "./matching";
 import { RateLimiter } from "./rateLimiter";
+import { maskEmail, maskPostcode } from "./utils/pii";
 
 // Define secrets for callable functions
 const resendApiKey = defineSecret("RESEND_API_KEY");
@@ -59,7 +60,9 @@ export const sendMagicLink = onCall(
   // Rate limit check - prevents spam attacks
   const rateLimitCheck = await RateLimiter.checkMagicLinkRequest(email);
   if (!rateLimitCheck.allowed) {
-    logger.warn('Magic link request blocked by rate limiter', { email: email.toLowerCase() });
+    logger.warn('Magic link request blocked by rate limiter', { 
+      email: maskEmail(email.toLowerCase()) 
+    });
     throw new HttpsError('resource-exhausted', rateLimitCheck.reason || 'Too many requests');
   }
 
@@ -75,7 +78,9 @@ export const sendMagicLink = onCall(
   if (snapshot.empty) {
     // Don't reveal whether email exists (prevent enumeration)
     // But still count against rate limit
-    logger.info('Magic link requested for non-existent email', { email: email.toLowerCase() });
+    logger.info('Magic link requested for non-existent email', { 
+      email: maskEmail(email.toLowerCase()) 
+    });
     return { success: true };
   }
 
@@ -83,7 +88,9 @@ export const sendMagicLink = onCall(
 
   // Only send if profile has session
   if (!profile.session_id) {
-    logger.info('Magic link requested for profile without session', { email: email.toLowerCase() });
+    logger.info('Magic link requested for profile without session', { 
+      email: maskEmail(email.toLowerCase()) 
+    });
     return { success: true };
   }
 
@@ -94,8 +101,8 @@ export const sendMagicLink = onCall(
   const locationInfo = await getLocationFromPostcode(profile.postcode);
   if (!locationInfo) {
     logger.warn("⚠️ Location lookup failed, using postcode fallback", {
-      postcode: profile.postcode,
-      email: email.toLowerCase()
+      postcode: maskPostcode(profile.postcode),
+      email: maskEmail(email.toLowerCase())
     });
   }
   const locationString = locationInfo
@@ -114,7 +121,7 @@ export const sendMagicLink = onCall(
 
   await EmailService.sendTemplateEmail(emailTemplate);
 
-  logger.info('Magic link sent', { email: email.toLowerCase() });
+  logger.info('Magic link sent', { email: maskEmail(email.toLowerCase()) });
 
   return { success: true };
 });
@@ -159,8 +166,8 @@ export const sendCompletionEmail = onCall(
   const locationInfo = await getLocationFromPostcode(profile.postcode);
   if (!locationInfo) {
     logger.warn("⚠️ Location lookup failed, using postcode fallback", {
-      postcode: profile.postcode,
-      email: email.toLowerCase()
+      postcode: maskPostcode(profile.postcode),
+      email: maskEmail(email.toLowerCase())
     });
   }
   const locationString = locationInfo
@@ -332,7 +339,7 @@ export const sendManualAbandonmentEmail = onCall(
         const locationInfo = await getLocationFromPostcode(profile.postcode);
         if (!locationInfo) {
           logger.warn("⚠️ Location lookup failed, using postcode fallback", {
-            postcode: profile.postcode,
+            postcode: maskPostcode(profile.postcode),
             sessionId: sessionId
           });
         }

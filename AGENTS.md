@@ -164,6 +164,47 @@ npm run emulator:seed
 > 2. **Backend Logic**: Use **Firebase Callable Functions** (`onCall`) for backend logic that requires safety or admin privileges (e.g., matching algorithms, emails). Call them via `database.functions.myFunction`.
 > 3. **Avoid**: Do NOT create custom Express/HTTP endpoints (`onRequest`) for internal tools. They require complex proxy configuration in Vite. Stick to standard Firebase patterns.
 
+> [!CAUTION]
+> **LLM Output Security**:
+> 
+> All LLM responses MUST be validated before applying state changes. The system uses `services/onboardingValidator.ts` to prevent prompt injection attacks.
+> 
+> **Why This Matters**:
+> - Attackers can use prompt injection to manipulate LLM output
+> - Without validation, users could skip onboarding steps or trigger unauthorized actions
+> - The validator enforces a strict state machine and data requirements
+> 
+> **Implementation**:
+> ```typescript
+> import { validateLLMResponse, logValidationFailure } from '../services/onboardingValidator';
+> 
+> const result = await getAgentResponse(profile, history);
+> 
+> // SECURITY: Validate before applying changes
+> const validation = validateLLMResponse(
+>   profile,
+>   result.next_step,
+>   result.profile_updates
+> );
+> 
+> if (!validation.isValid) {
+>   logValidationFailure(sessionId, currentStep, nextStep, validation.errors);
+>   // Reject transition and show fallback message
+>   return;
+> }
+> 
+> // Safe to apply changes
+> await db.updateProfile(sessionId, profileUpdates);
+> ```
+> 
+> **Key Rules**:
+> - Can only reach `COMPLETE` step from `CONFIRM` step
+> - Profile must have name, children, and location before completion
+> - All state transitions must follow the defined state machine
+> - Validation failures are logged for security monitoring
+> 
+> See `SECURITY.md` for complete documentation.
+
 > [!IMPORTANT]
 > **Firebase Admin SDK Timestamp Best Practices**:
 > 
