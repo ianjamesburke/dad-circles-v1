@@ -7,6 +7,7 @@ import {
     query,
     where,
     orderBy,
+    serverTimestamp,
 } from 'firebase/firestore';
 import { BlogPost } from '@/types';
 
@@ -31,11 +32,11 @@ export const getBlogPostBySlug = async (slug: string): Promise<BlogPost | undefi
 };
 
 export const createBlogPost = async (post: Omit<BlogPost, 'id' | 'published_at'>): Promise<BlogPost> => {
-    const postId = `post-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const postId = crypto.randomUUID();
     const newPost: BlogPost = {
         ...post,
         id: postId,
-        published_at: Date.now(),
+        published_at: serverTimestamp() as any,
     };
     const ref = doc(postsCol, postId);
     await setDoc(ref, newPost);

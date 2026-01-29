@@ -10,6 +10,7 @@ import {
   query,
   where,
   orderBy,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { Lead } from '../types';
 
@@ -18,7 +19,7 @@ const leadsCol = collection(db, 'leads');
 export const addLead = async (lead: Omit<Lead, 'id' | 'timestamp'>): Promise<Lead> => {
     const withTimestamp = {
       ...lead,
-      timestamp: Date.now(),
+      timestamp: serverTimestamp() as any,
     };
     const docRef = await addDoc(leadsCol, withTimestamp);
     const newLead: Lead = {

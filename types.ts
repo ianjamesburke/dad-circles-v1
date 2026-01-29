@@ -39,18 +39,24 @@ export interface UserProfile {
   interests?: string[];
   children: Child[];
   siblings?: Child[]; // Other existing children
-  last_updated: number;
+  last_updated: any; // Firestore Timestamp (server-side) or number (legacy)
 
   // Matching fields
   group_id?: string; // Reference to assigned group
-  matched_at?: number; // Timestamp when matched
+  matched_at?: any; // Firestore Timestamp
   matching_eligible: boolean; // True if onboarded with valid location and child data
+
+  // Email tracking fields
+  abandonment_sent?: boolean;
+  abandonment_sent_at?: any; // Firestore Timestamp
+  welcomeEmailSent?: boolean;
+  welcomeEmailSentAt?: any; // Firestore Timestamp
 }
 
 export interface Message {
   id: string;
   session_id: string;
-  timestamp: number;
+  timestamp: any; // Firestore Timestamp (server-side) or number (legacy)
   role: Role;
   content: string;
 }
@@ -61,7 +67,7 @@ export interface Lead {
   postcode: string;
   signupForOther: boolean;
   session_id?: string; // Links to UserProfile for non-signupForOther leads
-  timestamp: number;
+  timestamp: any; // Firestore Timestamp (server-side) or number (legacy)
   source: 'landing_page';
 
   // Email tracking fields
@@ -69,11 +75,26 @@ export interface Lead {
   welcomeEmailSentAt?: any; // Firestore timestamp
   welcomeEmailFailed?: boolean;
   welcomeEmailFailedAt?: any; // Firestore timestamp
+  welcomeEmailPending?: boolean;
+  welcomeEmailPendingAt?: any; // Firestore timestamp
 
+  // Abandonment email tracking (separate from welcome)
+  abandonmentEmailSent?: boolean;
+  abandonmentEmailSentAt?: any; // Firestore timestamp
+
+  // Signup-other email tracking
+  signupOtherEmailSent?: boolean;
+  signupOtherEmailSentAt?: any; // Firestore timestamp
+
+  // Follow-up email tracking
   followUpEmailSent?: boolean;
   followUpEmailSentAt?: any; // Firestore timestamp
   followUpEmailFailed?: boolean;
   followUpEmailFailedAt?: any; // Firestore timestamp
+
+  // Unified communication tracking (simplifies follow-up queries)
+  // Updated whenever a welcome or abandonment email is sent
+  last_communication_at?: any; // Firestore timestamp
 }
 
 export enum LifeStage {
@@ -86,13 +107,13 @@ export enum LifeStage {
 export interface Group {
   group_id: string;
   name: string;
-  created_at: number;
+  created_at: any; // Firestore Timestamp (server-side) or number (legacy)
   location: UserLocation;
   member_ids: string[]; // Array of session_ids (4-6 members)
   member_emails: string[]; // Array of member emails
   status: 'pending' | 'active' | 'inactive';
   emailed_member_ids: string[]; // Array of session_ids who successfully received the email
-  introduction_email_sent_at?: number; // Timestamp of first successful send
+  introduction_email_sent_at?: any; // Firestore Timestamp
   test_mode: boolean; // True for test groups
   life_stage: LifeStage; // The life stage this group represents
 }
@@ -117,7 +138,7 @@ export interface BlogPost {
   excerpt: string;
   content: string; // Markdown or HTML
   author: string;
-  published_at: number; // Timestamp
+  published_at: any; // Firestore Timestamp (server-side) or number (legacy)
   is_published: boolean;
   cover_image?: string; // URL or path
   tags?: string[];

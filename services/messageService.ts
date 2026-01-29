@@ -9,6 +9,7 @@ import {
   query,
   where,
   orderBy,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { Message } from '../types';
 
@@ -17,7 +18,7 @@ const messagesCol = collection(db, 'messages');
 export const addMessage = async (msg: Omit<Message, 'id' | 'timestamp'>): Promise<Message> => {
     const withTimestamp = {
       ...msg,
-      timestamp: Date.now(),
+      timestamp: serverTimestamp() as any,
     };
     const docRef = await addDoc(messagesCol, withTimestamp);
     const newMessage: Message = {

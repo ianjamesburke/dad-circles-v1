@@ -7,6 +7,8 @@ import { EmailService, EMAIL_TEMPLATES } from './emailService';
 import { getLocationFromPostcode, formatLocation } from './utils/location';
 import { generateMagicLink } from "./utils/link";
 import { runMatchingAlgorithm, seedTestData, approveAndEmailGroup, deleteGroup as deleteGroupLogic } from "./matching";
+import { RateLimiter } from "./rateLimiter";
+import { maskEmail, maskPostcode } from "./utils/pii";
 
 // Define secrets for callable functions
 const resendApiKey = defineSecret("RESEND_API_KEY");
@@ -41,6 +43,7 @@ export const runMatching = onCall({ cors: true }, async (request) => {
 
 /**
  * Send a magic link to resume a session
+ * Rate limited to prevent spam attacks
  */
 export const sendMagicLink = onCall(
   {
@@ -54,6 +57,15 @@ export const sendMagicLink = onCall(
     throw new HttpsError('invalid-argument', 'Email is required');
   }
 
+  // Rate limit check - prevents spam attacks
+  const rateLimitCheck = await RateLimiter.checkMagicLinkRequest(email);
+  if (!rateLimitCheck.allowed) {
+    logger.warn('Magic link request blocked by rate limiter', { 
+      email: maskEmail(email.toLowerCase()) 
+    });
+    throw new HttpsError('resource-exhausted', rateLimitCheck.reason || 'Too many requests');
+  }
+
   const db = admin.firestore();
 
   // Find profile by email
@@ -65,6 +77,10 @@ export const sendMagicLink = onCall(
 
   if (snapshot.empty) {
     // Don't reveal whether email exists (prevent enumeration)
+    // But still count against rate limit
+    logger.info('Magic link requested for non-existent email', { 
+      email: maskEmail(email.toLowerCase()) 
+    });
     return { success: true };
   }
 
@@ -72,14 +88,23 @@ export const sendMagicLink = onCall(
 
   // Only send if profile has session
   if (!profile.session_id) {
+    logger.info('Magic link requested for profile without session', { 
+      email: maskEmail(email.toLowerCase()) 
+    });
     return { success: true };
   }
 
   // Generate magic link
-        const magicLink = generateMagicLink(profile.session_id);
+  const magicLink = generateMagicLink(profile.session_id);
 
   // Get location string
   const locationInfo = await getLocationFromPostcode(profile.postcode);
+  if (!locationInfo) {
+    logger.warn("⚠️ Location lookup failed, using postcode fallback", {
+      postcode: maskPostcode(profile.postcode),
+      email: maskEmail(email.toLowerCase())
+    });
+  }
   const locationString = locationInfo
     ? formatLocation(locationInfo.city, locationInfo.stateCode)
     : profile.postcode;
@@ -96,7 +121,7 @@ export const sendMagicLink = onCall(
 
   await EmailService.sendTemplateEmail(emailTemplate);
 
-  logger.info('Magic link sent', { email: email.toLowerCase() });
+  logger.info('Magic link sent', { email: maskEmail(email.toLowerCase()) });
 
   return { success: true };
 });
@@ -139,6 +164,12 @@ export const sendCompletionEmail = onCall(
 
   // Get location
   const locationInfo = await getLocationFromPostcode(profile.postcode);
+  if (!locationInfo) {
+    logger.warn("⚠️ Location lookup failed, using postcode fallback", {
+      postcode: maskPostcode(profile.postcode),
+      email: maskEmail(email.toLowerCase())
+    });
+  }
   const locationString = locationInfo
     ? formatLocation(locationInfo.city, locationInfo.stateCode)
     : profile.postcode;
@@ -155,8 +186,11 @@ export const sendCompletionEmail = onCall(
   const success = await EmailService.sendTemplateEmail(emailTemplate);
 
   if (success) {
+    // Use batch write for atomic updates to profile and lead
+    const batch = db.batch();
+
     // Update profile
-    await profileRef.update({
+    batch.update(profileRef, {
       welcomeEmailSent: true,
       welcomeEmailSentAt: FieldValue.serverTimestamp(),
     });
@@ -168,12 +202,16 @@ export const sendCompletionEmail = onCall(
     const leadSnap = await leadQuery.get();
 
     if (!leadSnap.empty) {
-      await leadSnap.docs[0].ref.update({
+      batch.update(leadSnap.docs[0].ref, {
         welcomeEmailSent: true,
         welcomeEmailSentAt: FieldValue.serverTimestamp(),
         welcomeEmailPending: false,
+        last_communication_at: FieldValue.serverTimestamp(), // Track for follow-up emails
       });
     }
+
+    // Commit all updates atomically
+    await batch.commit();
   }
 
   return { success };
@@ -305,6 +343,12 @@ export const sendManualAbandonmentEmail = onCall(
 
         // Get location
         const locationInfo = await getLocationFromPostcode(profile.postcode);
+        if (!locationInfo) {
+          logger.warn("⚠️ Location lookup failed, using postcode fallback", {
+            postcode: maskPostcode(profile.postcode),
+            sessionId: sessionId
+          });
+        }
         const locationString = locationInfo
             ? formatLocation(locationInfo.city, locationInfo.stateCode)
             : profile.postcode;
@@ -324,7 +368,7 @@ export const sendManualAbandonmentEmail = onCall(
         if (success) {
             await profileRef.update({
                 abandonment_sent: true,
-                abandonment_sent_at: Date.now(),
+                abandonment_sent_at: FieldValue.serverTimestamp(),
             });
             logger.info("✅ Manual abandonment email sent successfully", { sessionId });
             return { success: true, message: 'Abandonment email sent successfully.' };

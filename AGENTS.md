@@ -5,6 +5,52 @@ This file provides guidance to Coding Agents for working with code in this repos
 > [!CAUTION]
 > **CRITICAL SECURITY RULE**: NEVER commit API keys, secrets, or `.env` files to the repository. Always use `.env.example` as a template and ensure `.env` is in `.gitignore`.
 
+## Recent Architecture Changes
+
+### Timestamp Standardization (January 2025)
+**All timestamps now use Firestore server timestamps for consistency and security.**
+
+**Cloud Functions (functions/src/):**
+```typescript
+import { FieldValue } from 'firebase-admin/firestore';
+
+// Always use server timestamps
+await profileRef.update({
+  last_updated: FieldValue.serverTimestamp(),
+  abandonment_sent_at: FieldValue.serverTimestamp()
+});
+```
+
+**Client-Side Services (services/):**
+```typescript
+import { serverTimestamp } from 'firebase/firestore';
+
+// Use client SDK server timestamp
+const profile = {
+  last_updated: serverTimestamp() as any,
+  created_at: serverTimestamp() as any
+};
+```
+
+**Why Server Timestamps?**
+- Prevents client time manipulation
+- Ensures consistency across all users
+- Better for time-based queries and ordering
+- Single source of truth (server clock)
+
+**Type Definitions:**
+All timestamp fields in `types.ts` now use `any` type to support both Firestore Timestamp objects and legacy number values during migration.
+
+**Reading Timestamps:**
+```typescript
+// Convert Firestore Timestamp to milliseconds for comparisons
+const lastUpdated = profile.last_updated?.toMillis?.() || 0;
+const oneHourAgo = Date.now() - (60 * 60 * 1000);
+if (lastUpdated < oneHourAgo) {
+  // User is inactive
+}
+```
+
 ## Overview
 
 Dad Circles Onboarding MVP is a conversational onboarding application built with React and Gemini 2.0 Flash LLM. The application guides new and expecting dads through a structured onboarding flow while collecting relevant user information (status, children, interests, location). The backend uses Firebase (Firestore for data, Cloud Functions for email), and the frontend is a Vite-powered React app with a test persona system and admin monitoring dashboard.
@@ -70,7 +116,7 @@ npm run emulator:seed
 ### High-Level Data Flow
 
 1. **Frontend (React/Vite)** → User interacts with chat interface or landing page
-2. **ChatInterface.tsx** → Processes user messages, manages conversation state
+2. **UserChatInterface.tsx** → Processes user messages, manages conversation state (production)
 3. **Gemini Service** (`services/geminiService.ts`) → Calls Google Gemini API with context, manages onboarding step logic
 4. **Database** (`database.ts`) → Firestore operations via Firebase Client SDK (profiles, messages, leads, groups)
 5. **Firebase Callable Functions** (`functions/src/callable.ts`) → Backend logic for matching, emails, magic links
@@ -78,7 +124,7 @@ npm run emulator:seed
 
 ### Key Directories
 
-- **`/components`** - React components: ChatInterface, LandingPage, Layout, ContextTestPanel
+- **`/components`** - React components: UserChatInterface (production), AdminChatInterface (testing), LandingPage, Layout
 - **`/components/admin`** - Modular admin dashboard: AdminLayout, AdminUsers, AdminGroups, AdminLeads, AdminOverview, AdminTools
 - **`/services`** - Core business logic: Gemini API integration, context management, matching
 - **`/utils`** - Utilities: analytics, location helpers, logger
@@ -118,37 +164,103 @@ npm run emulator:seed
 > 2. **Backend Logic**: Use **Firebase Callable Functions** (`onCall`) for backend logic that requires safety or admin privileges (e.g., matching algorithms, emails). Call them via `database.functions.myFunction`.
 > 3. **Avoid**: Do NOT create custom Express/HTTP endpoints (`onRequest`) for internal tools. They require complex proxy configuration in Vite. Stick to standard Firebase patterns.
 
+> [!CAUTION]
+> **LLM Output Security**:
+> 
+> All LLM responses MUST be validated before applying state changes. The system uses `services/onboardingValidator.ts` to prevent prompt injection attacks.
+> 
+> **Why This Matters**:
+> - Attackers can use prompt injection to manipulate LLM output
+> - Without validation, users could skip onboarding steps or trigger unauthorized actions
+> - The validator enforces a strict state machine and data requirements
+> 
+> **Implementation**:
+> ```typescript
+> import { validateLLMResponse, logValidationFailure } from '../services/onboardingValidator';
+> 
+> const result = await getAgentResponse(profile, history);
+> 
+> // SECURITY: Validate before applying changes
+> const validation = validateLLMResponse(
+>   profile,
+>   result.next_step,
+>   result.profile_updates
+> );
+> 
+> if (!validation.isValid) {
+>   logValidationFailure(sessionId, currentStep, nextStep, validation.errors);
+>   // Reject transition and show fallback message
+>   return;
+> }
+> 
+> // Safe to apply changes
+> await db.updateProfile(sessionId, profileUpdates);
+> ```
+> 
+> **Key Rules**:
+> - Can only reach `COMPLETE` step from `CONFIRM` step
+> - Profile must have name, children, and location before completion
+> - All state transitions must follow the defined state machine
+> - Validation failures are logged for security monitoring
+> 
+> See `SECURITY.md` for complete documentation.
+
 > [!IMPORTANT]
 > **Firebase Admin SDK Timestamp Best Practices**:
 > 
 > When working with timestamps in Cloud Functions (`functions/src/`), follow these patterns:
 > 
-> 1. **For Client Timestamps**: Use `Date.now()` - returns milliseconds since epoch as a number
->    ```typescript
->    await db.collection('profiles').doc(id).update({
->      last_updated: Date.now()
->    });
->    ```
-> 
-> 2. **For Server Timestamps**: Import `FieldValue` from `firebase-admin/firestore` (NOT `admin.firestore.FieldValue`)
+> 1. **Always Use Server Timestamps**: Import `FieldValue` from `firebase-admin/firestore` (NOT `admin.firestore.FieldValue`)
 >    ```typescript
 >    import { FieldValue } from 'firebase-admin/firestore';
 >    
 >    await db.collection('profiles').doc(id).update({
+>      last_updated: FieldValue.serverTimestamp(),
 >      created_at: FieldValue.serverTimestamp()
 >    });
 >    ```
 > 
-> 3. **Why This Matters**:
+> 2. **Why This Matters**:
 >    - `admin.firestore.FieldValue` can be `undefined` in Firebase emulator contexts
 >    - Modern Firebase Admin SDK (v9+) uses modular imports
->    - `Date.now()` is simpler and works consistently everywhere
->    - Use server timestamps only when you need true server-side time (e.g., for security)
+>    - Server timestamps prevent client time manipulation
+>    - Ensures consistency across all users and time zones
 > 
-> 4. **Current Codebase Pattern**:
->    - Most of the codebase uses `Date.now()` for timestamps
->    - This is the preferred approach for consistency
->    - Only use `FieldValue.serverTimestamp()` if you have a specific reason (e.g., preventing client time manipulation)
+> 3. **Client-Side Timestamps**:
+>    - Use `serverTimestamp()` from `firebase/firestore` (client SDK)
+>    - Cast to `any` for type compatibility: `serverTimestamp() as any`
+> 
+> 4. **Reading Timestamps**:
+>    - Firestore Timestamps have `.toMillis()` method
+>    - Use optional chaining: `timestamp?.toMillis?.() || 0`
+>    - For comparisons, convert to milliseconds first
+
+### System Behavior Notes
+
+**Email Simulation Mode:**
+The email system has clear precedence for simulation vs real sending:
+
+1. **Force Simulation** (highest priority) - Explicit `forceSimulation` parameter
+2. **Emulator + Override** - `FUNCTIONS_EMULATOR=true` + `SEND_REAL_EMAILS=true` → sends real emails
+3. **Emulator Default** - `FUNCTIONS_EMULATOR=true` → simulates (logs only)
+4. **Missing API Key** - No `RESEND_API_KEY` → simulates with warning
+5. **Production** - Valid API key → sends real emails
+
+```bash
+# Local dev - simulate all emails (default)
+npm run emulator
+
+# Local dev - send real emails for testing
+SEND_REAL_EMAILS=true npm run emulator
+```
+
+**Location Lookup Failures:**
+When `getLocationFromPostcode()` fails, the system:
+- Logs a warning with postcode and context
+- Falls back to raw postcode in emails (acceptable degraded experience)
+- Continues email sending (non-blocking failure)
+
+Monitor logs for location lookup failures and consider caching successful lookups.
 
 ### Logging Best Practices
 

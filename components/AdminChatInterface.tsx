@@ -2,6 +2,21 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../store';
 import { getAgentResponse } from '../services/geminiService';
 import { Role, Message, OnboardingStep } from '../types';
+import { validateLLMResponse, logValidationFailure } from '../services/onboardingValidator';
+
+/**
+ * AdminChatInterface - Testing tool for admins/developers
+ * 
+ * This component provides a quick way to test the onboarding flow with
+ * predefined test personas without going through the landing page.
+ * 
+ * Features:
+ * - Switch between test personas (User A, B, C)
+ * - Debug UI showing onboarding step status
+ * - Protected by admin authentication
+ * 
+ * For production user chat, see UserChatInterface.tsx
+ */
 
 const TEST_SESSIONS = [
   { id: 'user-a-complete', label: 'User A' },
@@ -9,7 +24,7 @@ const TEST_SESSIONS = [
   { id: 'user-c-fresh', label: 'User C' }
 ];
 
-export const ChatInterface: React.FC = () => {
+export const AdminChatInterface: React.FC = () => {
   const [sessionId, setSessionId] = useState(() => {
     return localStorage.getItem('dad_circles_active_test_session') || TEST_SESSIONS[0].id;
   });
@@ -119,6 +134,36 @@ export const ChatInterface: React.FC = () => {
       
       const result = await getAgentResponse(profile, history);
 
+      // SECURITY: Validate LLM response before applying state changes
+      const validation = validateLLMResponse(
+        profile,
+        result.next_step as OnboardingStep,
+        result.profile_updates
+      );
+
+      if (!validation.isValid) {
+        // Log security event
+        logValidationFailure(
+          sessionId,
+          profile.onboarding_step,
+          result.next_step as OnboardingStep,
+          validation.errors
+        );
+
+        // Reject the transition and show fallback message
+        console.error('🚨 [SECURITY] Invalid state transition blocked:', validation.errors);
+        
+        await db.addMessage({
+          session_id: sessionId,
+          role: Role.AGENT,
+          content: "I need to make sure I have all your information correct. Let me ask you a few more questions to complete your profile."
+        });
+
+        await loadMessages(sessionId);
+        setLoading(false);
+        return; // Stop processing this response
+      }
+
       if (result.profile_updates) {
         await db.updateProfile(sessionId, result.profile_updates);
       }
@@ -137,6 +182,16 @@ export const ChatInterface: React.FC = () => {
         role: Role.AGENT,
         content: result.message
       });
+
+      // Send completion email if onboarding is complete and user has email
+      if (isComplete && profile.email) {
+        try {
+          await db.sendCompletionEmail(profile.email, sessionId);
+        } catch (error) {
+          console.error('Error sending completion email:', error);
+          // Don't block the UI if email fails
+        }
+      }
 
       await loadMessages(sessionId);
       await loadProfile(sessionId);

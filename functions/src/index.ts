@@ -18,7 +18,8 @@ import { logger, DebugLogger } from "./logger";
 import { EmailService, EMAIL_TEMPLATES } from "./emailService";
 import { getLocationFromPostcode, formatLocation } from "./utils/location";
 import { generateMagicLink } from "./utils/link";
-import { runDailyMatching, sendPendingGroupEmails } from "./matching";
+import { runDailyMatching } from "./matching";
+import { maskEmail, maskPostcode } from "./utils/pii";
 
 // Define secrets - these are automatically loaded from .env in emulator mode
 // and from Cloud Secret Manager in production
@@ -73,24 +74,38 @@ export const sendWelcomeEmail = onDocumentCreated(
       const { email, postcode, signupForOther } = leadData;
 
       DebugLogger.info("🔍 Validating required fields", {
-        email: email,
-        postcode: postcode,
+        email: maskEmail(email),
+        postcode: maskPostcode(postcode),
         signupForOther: signupForOther,
         hasEmail: !!email,
         hasPostcode: !!postcode
       });
 
       if (!email || !postcode) {
-        DebugLogger.error("❌ Missing required fields", { email, postcode });
-        logger.error("Missing required fields", { email, postcode });
+        DebugLogger.error("❌ Missing required fields", { 
+          email: maskEmail(email), 
+          postcode: maskPostcode(postcode) 
+        });
+        logger.error("Missing required fields", { 
+          email: maskEmail(email), 
+          postcode: maskPostcode(postcode) 
+        });
         return;
       }
 
       // If signing up for someone else, send immediate email
       if (signupForOther) {
-        DebugLogger.info("📧 Sending immediate email for 'signup for other'", { email });
+        DebugLogger.info("📧 Sending immediate email for 'signup for other'", { 
+          email: maskEmail(email) 
+        });
         
         const locationInfo = await getLocationFromPostcode(postcode);
+        if (!locationInfo) {
+          logger.warn("⚠️ Location lookup failed, using postcode fallback", {
+            postcode: maskPostcode(postcode),
+            email: maskEmail(email)
+          });
+        }
         const locationString = locationInfo
           ? formatLocation(locationInfo.city, locationInfo.stateCode)
           : postcode;
@@ -107,6 +122,7 @@ export const sendWelcomeEmail = onDocumentCreated(
           await event.data?.ref.update({
             signupOtherEmailSent: true,
             signupOtherEmailSentAt: FieldValue.serverTimestamp(),
+            last_communication_at: FieldValue.serverTimestamp(), // Track for follow-up emails
           });
           logger.info("Signup-other email sent", { leadId: event.params.leadId });
         } else {
@@ -133,8 +149,13 @@ export const sendWelcomeEmail = onDocumentCreated(
  * Follow-up Email Function
  *
  * Scheduled to run daily at 10 AM UTC (adjust timezone as needed).
- * Sends follow-up emails to leads who signed up 24+ hours ago
- * and haven't received a follow-up email yet.
+ * Sends follow-up emails to leads who received a welcome or abandonment email
+ * 24+ hours ago and haven't received a follow-up email yet.
+ * 
+ * Uses the unified `last_communication_at` field to simplify querying.
+ * This field is set whenever a welcome-completed, welcome-abandoned, or
+ * signup-other email is sent, allowing us to use a single query instead
+ * of multiple queries with deduplication.
  */
 export const sendFollowUpEmails = onSchedule(
   {
@@ -151,12 +172,13 @@ export const sendFollowUpEmails = onSchedule(
       const now = Date.now();
       const oneDayAgo = now - (24 * 60 * 60 * 1000); // 24 hours ago
 
-      // Query for leads that need follow-up emails
+      // Single unified query using last_communication_at
+      // This replaces the previous dual-query approach (welcomeEmailSent + abandonmentEmailSent)
+      // and eliminates the need for manual deduplication
       const leadsQuery = db.collection("leads")
-        .where("timestamp", "<=", oneDayAgo)
-        .where("welcomeEmailSent", "==", true)
+        .where("last_communication_at", "<=", oneDayAgo)
         .where("followUpEmailSent", "!=", true)
-        .limit(50); // Process in batches to avoid timeouts
+        .limit(50);
 
       const snapshot = await leadsQuery.get();
 
@@ -179,6 +201,13 @@ export const sendFollowUpEmails = onSchedule(
         try {
           // Generate and send follow-up email
           const locationInfo = await getLocationFromPostcode(postcode);
+          if (!locationInfo) {
+            logger.warn("⚠️ Location lookup failed, using postcode fallback", {
+              postcode: maskPostcode(postcode),
+              email: maskEmail(email),
+              leadId: doc.id
+            });
+          }
           const locationString = locationInfo
             ? formatLocation(locationInfo.city, locationInfo.stateCode)
             : postcode;
@@ -200,7 +229,7 @@ export const sendFollowUpEmails = onSchedule(
 
             logger.info("Follow-up email sent", {
               leadId: doc.id,
-              email,
+              email: maskEmail(email),
             });
           } else {
             // Mark as failed
@@ -212,7 +241,7 @@ export const sendFollowUpEmails = onSchedule(
 
             logger.error("Follow-up email failed", {
               leadId: doc.id,
-              email,
+              email: maskEmail(email),
             });
           }
         } catch (error) {
@@ -291,35 +320,14 @@ export const runDailyMatchingJob = onSchedule(
 );
 
 /**
- * Group Email Processing Function
- *
- * Scheduled to run every 2 hours.
- * Sends introduction emails to newly formed groups.
- */
-
-export const processGroupEmails = onSchedule(
-  {
-    schedule: "0 */2 * * *", // Every 2 hours
-    timeZone: "UTC",
-    region: "us-central1",
-    secrets: [resendApiKey, defaultFromEmail, sendRealEmails],
-  },
-  async () => {
-    try {
-      logger.info("📧 Starting group email processing job");
-      await sendPendingGroupEmails();
-      logger.info("✅ Group email processing job completed successfully");
-    } catch (error) {
-      logger.error("❌ Group email processing job failed:", error);
-    }
-  }
-);
-
-/**
  * Abandonment Recovery Email Function
  *
  * Scheduled to run hourly from 8am-8pm ET.
  * Sends recovery emails to users who started onboarding but stopped for > 1 hour.
+ * 
+ * Note: last_updated tracks both profile changes AND user activity (messages).
+ * This means users actively chatting won't receive abandonment emails (correct behavior).
+ * The email is sent 1 hour after the user's last interaction.
  */
 export const sendAbandonedOnboardingEmails = onSchedule(
   {
@@ -370,6 +378,12 @@ export const sendAbandonedOnboardingEmails = onSchedule(
 
           // Get location
           const locationInfo = await getLocationFromPostcode(profile.postcode);
+          if (!locationInfo) {
+            logger.warn("⚠️ Location lookup failed, using postcode fallback", {
+              postcode: maskPostcode(profile.postcode),
+              session_id: profile.session_id
+            });
+          }
           const locationString = locationInfo
             ? formatLocation(locationInfo.city, locationInfo.stateCode)
             : profile.postcode;
@@ -387,16 +401,37 @@ export const sendAbandonedOnboardingEmails = onSchedule(
           const success = await EmailService.sendTemplateEmail(emailTemplate);
 
           if (success) {
-            await doc.ref.update({
+            // Use batch write for atomic updates to profile and lead
+            const batch = db.batch();
+
+            // Update profile
+            batch.update(doc.ref, {
               abandonment_sent: true,
-              abandonment_sent_at: Date.now(),
+              abandonment_sent_at: FieldValue.serverTimestamp(),
             });
+
+            // Update lead record to track abandonment email
+            const leadQuery = db.collection("leads")
+              .where("email", "==", profile.email.toLowerCase())
+              .limit(1);
+            const leadSnap = await leadQuery.get();
+
+            if (!leadSnap.empty) {
+              batch.update(leadSnap.docs[0].ref, {
+                abandonmentEmailSent: true,
+                abandonmentEmailSentAt: FieldValue.serverTimestamp(),
+                last_communication_at: FieldValue.serverTimestamp(), // Track for follow-up emails
+              });
+            }
+
+            // Commit all updates atomically
+            await batch.commit();
 
             emailsSent++;
 
             logger.info("✅ Abandonment email sent", {
               session_id: profile.session_id,
-              email: profile.email,
+              email: maskEmail(profile.email),
             });
           }
         } catch (error) {

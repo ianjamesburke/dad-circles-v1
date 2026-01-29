@@ -9,6 +9,7 @@
  */
 
 import * as admin from "firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "./logger";
 import { EmailService } from "./emailService";
 
@@ -29,14 +30,14 @@ interface UserProfile {
   }>;
   matching_eligible: boolean;
   group_id?: string;
-  matched_at?: number;
-  last_updated: number;
+  matched_at?: any; // Firestore Timestamp
+  last_updated: any; // Firestore Timestamp
 }
 
 interface Group {
   group_id: string;
   name: string;
-  created_at: number;
+  created_at: any; // Firestore Timestamp
   location: {
     city: string;
     state_code: string;
@@ -45,7 +46,7 @@ interface Group {
   member_emails: string[];
   status: 'pending' | 'active' | 'inactive';
   emailed_member_ids: string[];
-  introduction_email_sent_at?: any; // Timestamp
+  introduction_email_sent_at?: any; // Firestore Timestamp
   test_mode: boolean;
   life_stage: string;
 }
@@ -203,13 +204,13 @@ async function formGroupsFromUsers(
     if (chunk.length < config.minGroupSize) break;
     if (!validateAgeGap(chunk, lifeStage, config)) continue;
 
-    const groupId = `group-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const groupId = crypto.randomUUID();
     const groupName = `${location.city} ${lifeStage} Dads - Group ${groupSequence}`;
 
     const group: Group = {
       group_id: groupId,
       name: groupName,
-      created_at: Date.now(),
+      created_at: FieldValue.serverTimestamp(),
       location: location,
       member_ids: chunk.map(u => u.session_id),
       member_emails: chunk.map(u => u.email || '').filter(e => e),
@@ -239,8 +240,8 @@ async function assignUsersToGroups(groups: Group[]): Promise<void> {
       const userRef = admin.firestore().collection('profiles').doc(sessionId);
       batch.update(userRef, {
         group_id: group.group_id,
-        matched_at: Date.now(),
-        last_updated: Date.now()
+        matched_at: FieldValue.serverTimestamp(),
+        last_updated: FieldValue.serverTimestamp()
       });
     }
   }
@@ -305,7 +306,7 @@ export async function sendGroupIntroductionEmails(
     if (result.success && result.emailedMembers.length > 0) {
       await db.collection('groups').doc(group.group_id).update({
         emailed_member_ids: result.emailedMembers,
-        introduction_email_sent_at: Date.now(),
+        introduction_email_sent_at: FieldValue.serverTimestamp(),
         status: 'active'
       });
     }
@@ -479,7 +480,7 @@ export async function approveAndEmailGroup(groupId: string): Promise<{ success: 
       // Manually update group status to active since sendGroupIntroductionEmails didn't
       await db.collection('groups').doc(groupId).update({
         status: 'active',
-        introduction_email_sent_at: Date.now(),
+        introduction_email_sent_at: FieldValue.serverTimestamp(),
       });
       
       return { 
@@ -528,7 +529,7 @@ export async function deleteGroup(groupId: string): Promise<{ success: boolean; 
         batch.update(userRef, {
           group_id: null,
           matched_at: null,
-          last_updated: Date.now()
+          last_updated: FieldValue.serverTimestamp()
         });
         updatedCount++;
       } else {
@@ -701,7 +702,7 @@ export async function seedTestData(): Promise<void> {
       // but for seeding it's fine to just save it.
       children: [child],
       matching_eligible: true,
-      last_updated: Date.now()
+      last_updated: FieldValue.serverTimestamp()
     };
 
     // We can't strictly type-check 'interests' vs UserProfile 
@@ -717,8 +718,4 @@ export async function seedTestData(): Promise<void> {
 
   await batch.commit();
   logger.info(`🌱 Successfully seeded ${testUsers.length} test users`);
-}
-
-export async function sendPendingGroupEmails(): Promise<void> {
-  // Stub for now, can implement if needed or just use runMatching
 }

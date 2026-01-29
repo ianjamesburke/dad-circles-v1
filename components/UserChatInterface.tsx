@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { db } from '../store';
 import { getAgentResponse } from '../services/geminiService';
 import { Role, Message, OnboardingStep } from '../types';
+import { validateLLMResponse, logValidationFailure } from '../services/onboardingValidator';
 
 export const UserChatInterface: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -174,6 +175,46 @@ export const UserChatInterface: React.FC = () => {
       const result = await getAgentResponse(profile, history);
       if (import.meta.env.DEV) console.log(`✅ [${Date.now() - t0}ms] AI responded (took ${Date.now() - t2}ms)`);
 
+      // SECURITY: Validate LLM response before applying state changes
+      const validation = validateLLMResponse(
+        profile,
+        result.next_step as OnboardingStep,
+        result.profile_updates
+      );
+
+      if (!validation.isValid) {
+        // Log security event
+        logValidationFailure(
+          sessionId,
+          profile.onboarding_step,
+          result.next_step as OnboardingStep,
+          validation.errors
+        );
+
+        // Reject the transition and keep user at current step
+        console.error('🚨 [SECURITY] Invalid state transition blocked:', validation.errors);
+        
+        // Show a safe fallback message to the user
+        const fallbackMessage: Message = {
+          id: `temp-agent-${Date.now()}`,
+          session_id: sessionId,
+          role: Role.AGENT,
+          content: "I need to make sure I have all your information correct. Let me ask you a few more questions to complete your profile.",
+          timestamp: Date.now()
+        };
+        setMessages(prev => [...prev, fallbackMessage]);
+        setLoading(false);
+
+        // Save fallback message and keep profile at current step
+        db.addMessage({
+          session_id: sessionId,
+          role: Role.AGENT,
+          content: fallbackMessage.content
+        }).catch(err => console.error('Background save failed:', err));
+
+        return; // Stop processing this response
+      }
+
       // OPTIMIZATION 5: Add AI message optimistically
       const optimisticAgentMessage: Message = {
         id: `temp-agent-${Date.now()}`,
@@ -189,7 +230,7 @@ export const UserChatInterface: React.FC = () => {
         console.log(`🎉 TOTAL TIME: ${Date.now() - t0}ms`);
       }
 
-      // OPTIMIZATION 6: Update profile in memory immediately
+      // OPTIMIZATION 6: Update profile in memory immediately (only after validation passes)
       const isOnboardingComplete = result.next_step === OnboardingStep.COMPLETE;
       const profileUpdates = {
         ...result.profile_updates,

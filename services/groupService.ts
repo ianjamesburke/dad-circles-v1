@@ -9,17 +9,18 @@ import {
   query,
   where,
   orderBy,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { Group } from '../types';
 
 const groupsCol = collection(db, 'groups');
 
 export const createGroup = async (group: Omit<Group, 'group_id' | 'created_at'>): Promise<Group> => {
-    const groupId = `group-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const groupId = crypto.randomUUID();
     const newGroup: Group = {
       ...group,
       group_id: groupId,
-      created_at: Date.now(),
+      created_at: serverTimestamp() as any,
     };
     const ref = doc(groupsCol, groupId);
     await setDoc(ref, newGroup);

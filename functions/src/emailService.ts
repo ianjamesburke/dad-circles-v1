@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { logger } from "./logger";
+import { maskEmail } from "./utils/pii";
 
 // Initialize Resend with API key from environment
 // Handle missing API key gracefully for development/testing
@@ -29,7 +30,7 @@ export const EMAIL_TEMPLATES = {
 } as const;
 
 export class EmailService {
-  private static readonly DEFAULT_FROM = "Circle <circle@mail.dadcircles.com>";
+  private static readonly DEFAULT_FROM = "DadCircles <info@mail.dadcircles.com>";
   
   /**
    * Initialize Resend client lazily
@@ -79,7 +80,7 @@ export class EmailService {
 
       logger.info("📝 SIMULATED EMAIL LOG", {
         reason,
-        to: template.to,
+        to: maskEmail(template.to),
         from: from,
         subject: template.subject,
         htmlPreview: template.html.substring(0, 100) + "...",
@@ -91,7 +92,7 @@ export class EmailService {
         console.log("\n" + "=".repeat(50));
         console.log("📧 SIMULATED EMAIL DISPATCHED");
         console.log("=".repeat(50));
-        console.log(`To:      ${template.to}`);
+        console.log(`To:      ${maskEmail(template.to)}`);
         console.log(`From:    ${from}`);
         console.log(`Subject: ${template.subject}`);
         console.log(`Reason:  ${reason}`);
@@ -108,7 +109,7 @@ export class EmailService {
       if (!resend) throw new Error("Resend client not initialized");
 
       logger.info("🚀 Sending REAL email via Resend API", {
-        to: template.to,
+        to: maskEmail(template.to),
         from: from,
         subject: template.subject
       });
@@ -127,7 +128,7 @@ export class EmailService {
 
       logger.info("✅ Email sent successfully", {
         emailId: result.data?.id,
-        to: template.to,
+        to: maskEmail(template.to),
       });
 
       return true;
@@ -162,7 +163,7 @@ export class EmailService {
       console.log("\n" + "=".repeat(50));
       console.log("📧 SIMULATED TEMPLATE EMAIL");
       console.log("=".repeat(50));
-      console.log(`To:       ${template.to}`);
+      console.log(`To:       ${maskEmail(template.to)}`);
       console.log(`From:     ${from}`);
       console.log(`Template: ${template.templateId}`);
       console.log(`Variables:`, template.variables);
@@ -195,7 +196,7 @@ export class EmailService {
 
       logger.info("✅ Template email sent successfully", {
         emailId: result.data?.id,
-        to: template.to,
+        to: maskEmail(template.to),
         templateId: template.templateId,
       });
 
@@ -283,13 +284,13 @@ export class EmailService {
             emailedMembers.push(member.email);
           } else {
             logger.error("❌ Failed to send group introduction email", {
-              to: member.email,
+              to: maskEmail(member.email),
               groupName
             });
           }
         } catch (memberError) {
           logger.error("❌ Error sending group email to individual member", {
-            email: member.email,
+            email: maskEmail(member.email),
             error: memberError instanceof Error ? memberError.message : 'Unknown error',
             stack: memberError instanceof Error ? memberError.stack : undefined
           });
