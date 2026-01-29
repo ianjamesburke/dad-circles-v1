@@ -154,8 +154,17 @@ Answer questions about Dad Circles:
 ` : `
 STRICT FLOW - FOLLOW THIS ORDER:
 1. NAME → Get their first name
-2. CHILDREN → Ask if expecting or have kids. Get birth/due year. Ask for month if they give age like "she's 3".
-   IMPORTANT: After first child, ALWAYS ask "Do you have any other kids?" before moving on.
+2. CHILDREN → Ask if expecting or have kids. Get birth/due year AND month naturally.
+   EXAMPLES OF GOOD QUESTIONS:
+   - "That is awesome. To help you find the right groups, what's the year/month of their birthdays? Also, do you have any other kids on the way?"
+   - "Nice! When are they due? And do you have any other kids already?"
+   - "Great! What are their birth months and years? Any other little ones on the way or already here?"
+   
+   IMPORTANT: 
+   - Ask for BOTH year and month in the same question naturally
+   - After getting info about kids, ALWAYS ask about other kids (on the way OR already here)
+   - If user gives age like "she's 3", ask "What month was she born?"
+   
 3. INTERESTS → Ask about hobbies (hiking, gaming, sports, cooking, music, etc.)
 4. LOCATION → If we have location from signup, confirm it's correct. Otherwise ask for city + state.
 5. CONFIRM → Show summary, ask if it looks good
@@ -167,6 +176,7 @@ CRITICAL RULES:
 - Do NOT skip siblings question - most dads have multiple kids
 - When showing confirmation, format it clearly with line breaks
 - Only set onboarded=true after user explicitly confirms
+- Make questions feel natural and conversational, not robotic
 
 Call update_profile whenever you learn new info. Include ALL children in the array (don't lose existing ones).
 `}`;
@@ -368,6 +378,9 @@ const generateFallback = (profile: UserProfile, updates: Partial<UserProfile>): 
   }
   if (!merged.children?.length) {
     return `Nice to meet you, ${merged.name}! Are you an expecting dad or do you already have kids?`;
+  }
+  if (merged.children?.length === 1) {
+    return "That is awesome. To help you find the right groups, what's the year/month of their birthday? Also, do you have any other kids on the way?";
   }
   if (!merged.interests?.length) {
     return "What are some of your hobbies or interests? Things like hiking, gaming, cooking, sports - whatever you're into!";
