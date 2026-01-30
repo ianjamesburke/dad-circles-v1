@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { database } from '../../database';
 import { UserProfile, OnboardingStep } from '../../types';
+import { formatChildInfo } from '../../utils/childDisplay';
 
 type FilterStatus = 'all' | 'onboarded' | 'in_progress' | 'matched' | 'unmatched';
 
@@ -72,11 +73,7 @@ export const AdminUsers: React.FC = () => {
 
   const getChildInfo = (profile: UserProfile) => {
     if (!profile.children || profile.children.length === 0) return 'No children info';
-    const child = profile.children[0];
-    if (child.type === 'expecting') {
-      return `Expecting ${child.birth_month}/${child.birth_year}`;
-    }
-    return `Child born ${child.birth_month}/${child.birth_year}`;
+    return formatChildInfo(profile.children[0]);
   };
 
   if (loading) {
@@ -201,7 +198,7 @@ export const AdminUsers: React.FC = () => {
                   </td>
                   <td className="px-4 py-4">
                     <p className="text-slate-500 text-sm">
-                      {new Date(profile.last_updated).toLocaleDateString()}
+                      {new Date(profile.last_updated?.toMillis?.() || profile.last_updated || 0).toLocaleDateString()}
                     </p>
                   </td>
                   <td className="px-4 py-4 text-right">

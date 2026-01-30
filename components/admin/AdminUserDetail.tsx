@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { database } from '../../database';
 import { UserProfile, Message, Role, Group } from '../../types';
+import { formatChildDate, isExpecting } from '../../utils/childDisplay';
 
 export const AdminUserDetail: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -160,7 +161,7 @@ export const AdminUserDetail: React.FC = () => {
               </div>
               <div>
                 <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Last Updated</p>
-                <p className="text-white">{new Date(profile.last_updated).toLocaleString()}</p>
+                <p className="text-white">{new Date(profile.last_updated?.toMillis?.() || profile.last_updated || 0).toLocaleString()}</p>
               </div>
             </div>
           </div>
@@ -200,13 +201,13 @@ export const AdminUserDetail: React.FC = () => {
                 {profile.children.map((child, idx) => (
                   <div key={idx} className="bg-slate-800 rounded-lg p-3">
                     <div className="flex items-center gap-2 mb-2">
-                      <i className={`fas ${child.type === 'expecting' ? 'fa-baby-carriage' : 'fa-baby'} text-blue-400`}></i>
+                      <i className={`fas ${isExpecting(child) ? 'fa-baby-carriage' : 'fa-baby'} text-blue-400`}></i>
                       <span className="text-white font-medium">
-                        {child.type === 'expecting' ? 'Expecting' : 'Child'}
+                        {isExpecting(child) ? 'Expecting' : 'Child'}
                       </span>
                     </div>
                     <p className="text-slate-400 text-sm">
-                      {child.type === 'expecting' ? 'Due' : 'Born'}: {child.birth_month}/{child.birth_year}
+                      {isExpecting(child) ? 'Due' : 'Born'}: {formatChildDate(child)}
                     </p>
                     {child.gender && (
                       <p className="text-slate-400 text-sm">Gender: {child.gender}</p>
@@ -225,7 +226,7 @@ export const AdminUserDetail: React.FC = () => {
                   {profile.siblings.map((sibling, idx) => (
                     <div key={idx} className="bg-slate-800/50 rounded-lg p-2 text-sm">
                       <p className="text-slate-400">
-                        Born {sibling.birth_month}/{sibling.birth_year}
+                        Born {formatChildDate(sibling)}
                         {sibling.gender && ` • ${sibling.gender}`}
                       </p>
                     </div>
@@ -303,7 +304,7 @@ export const AdminUserDetail: React.FC = () => {
                       <div className="flex items-center gap-2 mb-1 text-xs opacity-70">
                         <span className="uppercase font-medium">{msg.role}</span>
                         <span>•</span>
-                        <span>{new Date(msg.timestamp).toLocaleTimeString()}</span>
+                        <span>{new Date(msg.timestamp?.toMillis?.() || msg.timestamp || 0).toLocaleTimeString()}</span>
                       </div>
                       <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                     </div>

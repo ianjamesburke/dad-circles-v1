@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { db } from '../store';
-import { getAgentResponse } from '../services/geminiService';
+import { getAgentResponse } from '../services/callableGeminiService';
 import { Role, Message, OnboardingStep } from '../types';
 import { validateLLMResponse, logValidationFailure } from '../services/onboardingValidator';
 
@@ -194,12 +194,37 @@ export const UserChatInterface: React.FC = () => {
         // Reject the transition and keep user at current step
         console.error('🚨 [SECURITY] Invalid state transition blocked:', validation.errors);
         
-        // Show a safe fallback message to the user
+        // Generate a contextual fallback message based on current step
+        let fallbackContent = "I need to make sure I have all your information correct. ";
+        
+        switch (profile.onboarding_step) {
+          case OnboardingStep.CHILD_INFO:
+            fallbackContent = "I need the birth month and year for your child. For example, 'March 2023' or 'June 2024'. When was your child born?";
+            break;
+          case OnboardingStep.SIBLINGS:
+            fallbackContent = "Do you have any other children besides the one you just told me about?";
+            break;
+          case OnboardingStep.INTERESTS:
+            fallbackContent = "What are some of your hobbies or interests? Things like hiking, gaming, cooking, sports, etc.";
+            break;
+          case OnboardingStep.LOCATION:
+            fallbackContent = "What city and state are you located in? For example, 'Austin, TX' or 'Portland, OR'.";
+            break;
+          case OnboardingStep.CONFIRM:
+            fallbackContent = "Does the information I showed you look correct? Please say 'yes' to confirm or tell me what needs to be changed.";
+            break;
+          default:
+            // TODO: This is the fallback for system errors, but it shouldn't be. We should have a technical difficulties catch-all for when everything breaks.
+            fallbackContent = "I need to make sure I have all your information correct. Let me ask you a few more questions to complete your profile.";
+        }
+        
+        // Show a contextual fallback message to the user
         const fallbackMessage: Message = {
-          id: `temp-agent-${Date.now()}`,
+          id: `temp-agent-${crypto.randomUUID()}`,
+
           session_id: sessionId,
           role: Role.AGENT,
-          content: "I need to make sure I have all your information correct. Let me ask you a few more questions to complete your profile.",
+          content: fallbackContent,
           timestamp: Date.now()
         };
         setMessages(prev => [...prev, fallbackMessage]);

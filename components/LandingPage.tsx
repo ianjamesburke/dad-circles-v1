@@ -351,14 +351,14 @@ const LandingPage: React.FC = () => {
                 This model works for Mums. We’re adapting the proven social infrastructure for Dads.
               </p>
             </div>
-            <div style={styles.citationBox}>
-              <h5 style={styles.h5}>Data Sources & Research</h5>
+          </div>
+          <div style={styles.citationBox}>
+            <h5 style={styles.h5}>Data Sources & Research</h5>
               <div style={styles.linksGrid}>
                 <span style={styles.citeLink}>BMC Public Health</span>
                 <span style={styles.citeLink}>American Journal of Men’s Health</span>
                 <span style={styles.citeLink}>JAMA Pediatrics</span>
                 <span style={styles.citeLink}>PMC Parent Groups</span>
-              </div>
             </div>
           </div>
         </div>
@@ -420,7 +420,7 @@ const LandingPage: React.FC = () => {
                   <img src={post.cover_image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <div style={styles.blogContent}>
-                  <span style={styles.blogDate}>{new Date(post.published_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                  <span style={styles.blogDate}>{new Date(post.published_at?.toMillis?.() || post.published_at || 0).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
                   <h4 style={styles.blogTitle}>{post.title}</h4>
                   <p style={styles.blogExcerpt}>{post.excerpt}</p>
                 </div>
@@ -874,18 +874,18 @@ const getStyles = (isMobile: boolean) => ({
 
   // Sections
   section: {
-    padding: isMobile ? '80px 0' : '140px 0',
+    padding: isMobile ? '48px 0' : '140px 0',
     background: '#ffffff',
   },
   sectionLight: {
-    padding: isMobile ? '80px 0' : '140px 0',
+    padding: isMobile ? '48px 0' : '140px 0',
     background: '#f8fafc',
   },
   sectionHeader: {
     textAlign: 'center' as const,
-    marginBottom: isMobile ? '48px' : '80px',
+    marginBottom: isMobile ? '32px' : '80px',
     maxWidth: '800px',
-    margin: isMobile ? '0 auto 48px' : '0 auto 80px',
+    margin: isMobile ? '0 auto 32px' : '0 auto 80px',
   },
   h2: {
     fontSize: isMobile ? '2.25rem' : '3.5rem',
@@ -930,24 +930,24 @@ const getStyles = (isMobile: boolean) => ({
     gap: isMobile ? '32px' : '48px',
   },
   stepCard: {
-    padding: '40px',
-    borderRadius: '24px',
+    padding: isMobile ? '24px 20px' : '40px',
+    borderRadius: isMobile ? '16px' : '24px',
     background: '#f8fafc',
     position: 'relative' as const,
     transition: 'transform 0.2s',
   },
   stepNumber: {
-    width: '48px',
-    height: '48px',
+    width: isMobile ? '40px' : '48px',
+    height: isMobile ? '40px' : '48px',
     background: '#6366f1',
     color: 'white',
-    borderRadius: '14px',
+    borderRadius: isMobile ? '12px' : '14px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontWeight: 800,
-    marginBottom: '32px',
-    fontSize: '1.25rem',
+    marginBottom: isMobile ? '20px' : '32px',
+    fontSize: isMobile ? '1.1rem' : '1.25rem',
     boxShadow: '0 8px 16px -4px rgba(99, 102, 241, 0.3)',
   },
   h3: {
@@ -971,13 +971,13 @@ const getStyles = (isMobile: boolean) => ({
 
   // Social Proof
   socialProofSection: {
-    padding: isMobile ? '40px 0' : '80px 0',
+    padding: isMobile ? '32px 0' : '80px 0',
     cursor: 'pointer',
   },
   proofCard: {
     background: '#0f172a',
-    borderRadius: '40px',
-    padding: isMobile ? '60px 24px' : '100px 80px',
+    borderRadius: isMobile ? '24px' : '40px',
+    padding: isMobile ? '40px 20px' : '100px 80px',
     textAlign: 'center' as const,
     color: '#ffffff',
     boxShadow: '0 40px 80px -20px rgba(15, 23, 42, 0.4)',
@@ -1017,24 +1017,25 @@ const getStyles = (isMobile: boolean) => ({
   researchGrid: {
     display: 'grid',
     gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-    gap: isMobile ? '24px' : '40px',
-    marginBottom: '60px',
+    gap: isMobile ? '16px' : '40px',
+    marginBottom: isMobile ? '24px' : '60px',
   },
   researchItem: {
     display: 'flex',
-    gap: '24px',
+    flexDirection: isMobile ? 'column' as const : 'row' as const,
+    gap: isMobile ? '12px' : '24px',
     background: 'white',
-    padding: isMobile ? '32px 24px' : '40px',
-    borderRadius: '24px',
+    padding: isMobile ? '20px 16px' : '40px',
+    borderRadius: isMobile ? '16px' : '24px',
     boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
-    alignItems: 'flex-start',
+    alignItems: isMobile ? 'flex-start' : 'flex-start',
   },
   researchIcon: {
-    fontSize: '2rem',
+    fontSize: isMobile ? '1.5rem' : '2rem',
     background: '#eff6ff',
-    width: '64px',
-    height: '64px',
-    borderRadius: '16px',
+    width: isMobile ? '48px' : '64px',
+    height: isMobile ? '48px' : '64px',
+    borderRadius: isMobile ? '12px' : '16px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1059,8 +1060,11 @@ const getStyles = (isMobile: boolean) => ({
   },
   citationBox: {
     background: '#f1f5f9',
-    padding: isMobile ? '32px' : '48px',
-    borderRadius: '24px',
+    padding: isMobile ? '20px 16px' : '48px',
+    borderRadius: isMobile ? '16px' : '24px',
+    maxWidth: '600px',
+    margin: '0 auto',
+    textAlign: 'center' as const,
   },
   h5: {
     fontSize: '0.85rem',
@@ -1068,13 +1072,14 @@ const getStyles = (isMobile: boolean) => ({
     textTransform: 'uppercase' as const,
     letterSpacing: '0.05em',
     color: '#94a3b8',
-    marginBottom: '24px',
+    marginBottom: isMobile ? '16px' : '24px',
   },
   linksGrid: {
     display: 'flex',
+    flexDirection: isMobile ? 'column' as const : 'row' as const,
     flexWrap: 'wrap' as const,
-    gap: '24px',
-    justifyContent: 'space-between',
+    gap: isMobile ? '8px' : '24px',
+    justifyContent: 'center',
   },
   citeLink: {
     fontSize: '0.9rem',

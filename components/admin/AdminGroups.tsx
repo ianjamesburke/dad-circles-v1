@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { database } from '../../database';
 import { Group, UserProfile } from '../../types';
+import { formatChildInfo } from '../../utils/childDisplay';
 
 type TabType = 'pending' | 'active';
 
@@ -289,10 +290,7 @@ export const AdminGroups: React.FC = () => {
                               </p>
                               {member.children && member.children.length > 0 && (
                                 <p className="text-slate-500 text-xs mt-1">
-                                  {member.children[0].type === 'expecting'
-                                    ? `Expecting ${member.children[0].birth_month}/${member.children[0].birth_year}`
-                                    : `Child born ${member.children[0].birth_month}/${member.children[0].birth_year}`
-                                  }
+                                  {formatChildInfo(member.children[0])}
                                 </p>
                               )}
                             </div>
@@ -304,9 +302,9 @@ export const AdminGroups: React.FC = () => {
 
                     {/* Group Meta */}
                     <div className="mt-4 pt-4 border-t border-slate-700 flex flex-wrap gap-4 text-xs text-slate-500">
-                      <span>Created: {new Date(group.created_at).toLocaleString()}</span>
+                      <span>Created: {new Date(group.created_at?.toMillis?.() || group.created_at || 0).toLocaleString()}</span>
                       {group.introduction_email_sent_at && (
-                        <span>Emails sent: {new Date(group.introduction_email_sent_at).toLocaleString()}</span>
+                        <span>Emails sent: {new Date(group.introduction_email_sent_at?.toMillis?.() || group.introduction_email_sent_at || 0).toLocaleString()}</span>
                       )}
                       <span className="font-mono">ID: {group.group_id}</span>
                     </div>

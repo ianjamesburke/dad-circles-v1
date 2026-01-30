@@ -17,8 +17,8 @@ import { FieldValue } from "firebase-admin/firestore";
 import { logger, DebugLogger } from "./logger";
 import { EmailService, EMAIL_TEMPLATES } from "./emailService";
 import { getLocationFromPostcode, formatLocation } from "./utils/location";
-import { generateMagicLink } from "./utils/link";
-import { runDailyMatching } from "./matching";
+// import { generateMagicLink } from "./utils/link"; // Temporarily unused while abandonment cron is disabled
+// import { runDailyMatching } from "./matching"; // Temporarily unused while matching cron is disabled
 import { maskEmail, maskPostcode } from "./utils/pii";
 
 // Define secrets - these are automatically loaded from .env in emulator mode
@@ -29,6 +29,9 @@ export const sendRealEmails = defineSecret("SEND_REAL_EMAILS");
 
 // Export Callable Functions for Admin Dashboard
 export { runMatching, seedData, approveGroup, deleteGroup, sendMagicLink, sendCompletionEmail, sendManualAbandonmentEmail } from "./callable";
+
+// Export Gemini AI Function
+export { getGeminiResponse } from "./gemini/index";
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -59,19 +62,21 @@ export const sendWelcomeEmail = onDocumentCreated(
     try {
       DebugLogger.info("📄 Extracting lead data from event");
       const leadData = event.data?.data();
-
-      DebugLogger.info("📊 Lead data extracted", {
-        hasData: !!leadData,
-        leadData: leadData
-      });
-
+      
+      
       if (!leadData) {
         DebugLogger.error("❌ No lead data found in document");
         logger.error("No lead data found in document");
         return;
       }
-
+      
       const { email, postcode, signupForOther } = leadData;
+
+      DebugLogger.info("📊 Lead data extracted", {
+        hasData: !!leadData,
+        email: maskEmail(email),
+        postcode: maskPostcode(postcode)
+      });
 
       DebugLogger.info("🔍 Validating required fields", {
         email: maskEmail(email),
@@ -146,17 +151,15 @@ export const sendWelcomeEmail = onDocumentCreated(
 );
 
 /**
- * Follow-up Email Function
+ * Follow-up Email Function (TEMPORARILY DISABLED)
  *
- * Scheduled to run daily at 10 AM UTC (adjust timezone as needed).
- * Sends follow-up emails to leads who received a welcome or abandonment email
- * 24+ hours ago and haven't received a follow-up email yet.
+ * Sends follow-up/nurture emails to leads 72+ hours after their last communication.
+ * Runs daily at 10 AM UTC.
  * 
- * Uses the unified `last_communication_at` field to simplify querying.
- * This field is set whenever a welcome-completed, welcome-abandoned, or
- * signup-other email is sent, allowing us to use a single query instead
- * of multiple queries with deduplication.
+ * Query: leads where followUpEmailSent != true AND last_communication_at <= 72hrs ago
+ * Index required: followUpEmailSent (ASC) + last_communication_at (ASC)
  */
+/*
 export const sendFollowUpEmails = onSchedule(
   {
     schedule: "0 10 * * *", // Daily at 10 AM UTC
@@ -170,14 +173,11 @@ export const sendFollowUpEmails = onSchedule(
 
       const db = admin.firestore();
       const now = Date.now();
-      const oneDayAgo = now - (24 * 60 * 60 * 1000); // 24 hours ago
+      const threeDaysAgo = now - (72 * 60 * 60 * 1000); // 72 hours ago
 
-      // Single unified query using last_communication_at
-      // This replaces the previous dual-query approach (welcomeEmailSent + abandonmentEmailSent)
-      // and eliminates the need for manual deduplication
       const leadsQuery = db.collection("leads")
-        .where("last_communication_at", "<=", oneDayAgo)
         .where("followUpEmailSent", "!=", true)
+        .where("last_communication_at", "<=", threeDaysAgo)
         .limit(50);
 
       const snapshot = await leadsQuery.get();
@@ -266,6 +266,7 @@ export const sendFollowUpEmails = onSchedule(
     }
   }
 );
+*/
 
 /**
  * Test function for development
@@ -300,7 +301,10 @@ export const testEmail = onSchedule(
  *
  * Scheduled to run daily at 9 AM UTC.
  * Scans all cities and runs matching for any city with >= 4 unmatched users in a bucket.
+ * 
+ * TEMPORARILY DISABLED - Use manual matching in Admin Dashboard instead
  */
+/*
 export const runDailyMatchingJob = onSchedule(
   {
     schedule: "0 9 * * *", // Daily at 9 AM UTC
@@ -318,6 +322,7 @@ export const runDailyMatchingJob = onSchedule(
     }
   }
 );
+*/
 
 /**
  * Abandonment Recovery Email Function
@@ -328,7 +333,10 @@ export const runDailyMatchingJob = onSchedule(
  * Note: last_updated tracks both profile changes AND user activity (messages).
  * This means users actively chatting won't receive abandonment emails (correct behavior).
  * The email is sent 1 hour after the user's last interaction.
+ * 
+ * TEMPORARILY DISABLED - Use manual trigger in Admin Dashboard instead
  */
+/*
 export const sendAbandonedOnboardingEmails = onSchedule(
   {
     schedule: "0 8-20 * * *",
@@ -448,4 +456,6 @@ export const sendAbandonedOnboardingEmails = onSchedule(
     }
   }
 );
+// End of commented out function
+*/
 

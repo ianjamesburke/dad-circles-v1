@@ -2,10 +2,46 @@
 
 This file provides guidance to Coding Agents for working with code in this repository.
 
+> [!IMPORTANT]
+> **DO NOT CREATE SUMMARY FILES**: Do not create markdown files to summarize your work, document your process, or track changes unless explicitly requested by the user. This includes files like SUMMARY.md, CHANGES.md, WORK_LOG.md, etc. Focus on code changes only.
+
 > [!CAUTION]
 > **CRITICAL SECURITY RULE**: NEVER commit API keys, secrets, or `.env` files to the repository. Always use `.env.example` as a template and ensure `.env` is in `.gitignore`.
 
 ## Recent Architecture Changes
+
+**NEW ARCHITECTURE**:
+```
+Client → Cloud Function (getGeminiResponse) → Gemini API
+```
+
+**Implementation**:
+- **Backend**: `functions/src/gemini.ts` - Secure Cloud Function with API key in Firebase Secrets
+- **Client**: `services/callableGeminiService.ts` - Calls the Cloud Function via `httpsCallable`
+- **Deprecated**: `services/geminiService.ts` - Old insecure implementation (DO NOT USE)
+
+**Local Development Setup**:
+```bash
+# Create secret file for emulators
+echo "GEMINI_API_KEY=your_key" > functions/.secret.local
+
+# Or use the setup script
+./scripts/setup-gemini-secret.sh
+```
+
+**Production Setup**:
+```bash
+# Store in Firebase Secrets (one-time)
+firebase functions:secrets:set GEMINI_API_KEY
+```
+
+**Key Benefits**:
+- API key never exposed to client
+- Server-side rate limiting possible
+- Audit trail for all API calls
+- Centralized cost control
+
+See `docs/GEMINI_API_SECURITY.md` for complete documentation.
 
 ### Timestamp Standardization (January 2025)
 **All timestamps now use Firestore server timestamps for consistency and security.**
@@ -295,13 +331,64 @@ The system strictly follows a defined sequence of onboarding steps. The Gemini S
 
 The system is designed to extract user intent from natural language and progress through the state machine strictly (no skipping steps without explicit user confirmation).
 
-### Context Window Management
-Context management is critical for cost and quality. The `services/contextManager.ts` implements smart message slicing:
-- Recent messages are prioritized
-- Token counting estimates context size
-- Config in `config/contextConfig.ts` defines limits by onboarding step
+### Configuration Management
 
-This prevents overwhelming the Gemini API with unnecessary history while maintaining conversation state.
+**Centralized Configuration Files:**
+
+1. **`functions/src/config.ts`** - Backend configuration (Cloud Functions)
+   - Gemini API settings (model, timeout, temperature, tokens)
+   - Rate limiting rules (magic links, Gemini API)
+   - Validation constraints (message length, birth years, history length)
+   - UI-related settings
+
+2. **`config/contextConfig.ts`** - Client-side configuration
+   - Context window management per use case (chat, admin, gemini-call)
+   - Message length validation (must match backend)
+   - Message preservation strategies
+
+**Key Configuration Values:**
+
+```typescript
+// Backend (functions/src/config.ts)
+CONFIG = {
+  gemini: {
+    model: 'gemini-3-flash-preview',
+    timeout: 30,
+    maxOutputTokens: 512,
+    temperature: 0.4,
+  },
+  validation: {
+    maxMessageLength: 1000,      // Max chars per message
+    maxHistoryLength: 50,        // Max messages in history
+    minBirthYear: 2015,
+    maxBirthYear: 2035,
+  },
+  rateLimits: {
+    gemini: {
+      maxAttempts: 20,           // Per minute
+      windowMs: 60000,
+    },
+    magicLink: {
+      maxAttempts: 3,            // Per hour
+      windowMs: 3600000,
+    }
+  }
+}
+
+// Client (config/contextConfig.ts)
+contextConfigs = {
+  'gemini-call': {
+    maxMessages: 30,             // Sent to backend
+    preserveFirstCount: 2,
+    preserveRecentCount: 28,
+  }
+}
+```
+
+**Important Rules:**
+- Always use config values instead of hardcoding
+- Keep client `MAX_MESSAGE_LENGTH` in sync with backend `validation.maxMessageLength`
+- Context window management prevents overwhelming the Gemini API with unnecessary history while maintaining conversation state
 
 ### Firebase Emulator for Development
 The app supports Firebase emulators for local development (Firestore, Functions, Auth). The emulator can be started with `npm run emulator` or `npm run dev:full` for the complete development environment. Connection is configured in `firebase.ts` and automatically detects when running in emulator mode.
@@ -330,33 +417,59 @@ The email system uses Resend template aliases for all emails. See `EMAIL_MIGRATI
 
 The `EmailService` class (`functions/src/emailService.ts`) handles Resend API calls with automatic simulation in emulator mode (unless `SEND_REAL_EMAILS=true`).
 
-## Environment Variables
+### Firestore Indexes
 
-> [!CAUTION]
-> **NEVER commit your actual `.env` file or any API keys to version control.**
+> [!IMPORTANT]
+> **When adding or modifying Firestore queries in Cloud Functions, check if a composite index is required.**
 
-Create a `.env` file in the root with:
+Firestore requires composite indexes for queries that filter or order on multiple fields. Single-field queries (e.g., `.where('email', '==', value)`) don't need indexes, but multi-field queries do.
 
-```
-# Gemini API
-VITE_GEMINI_API_KEY=your_gemini_api_key
+**Index Configuration:** `firestore.indexes.json`
 
-# Firebase (if not using emulator)
-VITE_FIREBASE_API_KEY=your_key
-VITE_FIREBASE_AUTH_DOMAIN=your_domain
-VITE_FIREBASE_PROJECT_ID=dad-circles
-VITE_FIREBASE_STORAGE_BUCKET=your_bucket
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_id
-VITE_FIREBASE_APP_ID=your_app_id
+**Current Indexes:**
 
-# Resend Email Service (for Cloud Functions)
-RESEND_API_KEY=your_resend_key
-```
+| Collection | Fields | Used By |
+|------------|--------|---------|
+| `messages` | `session_id` (ASC), `timestamp` (ASC) | Message history queries |
+| `profiles` | `onboarded` (ASC), `last_updated` (ASC) | Abandonment email job |
+| `leads` | `welcomeEmailSent` (ASC), `followUpEmailSent` (ASC), `timestamp` (ASC) | Legacy email tracking |
+| `leads` | `followUpEmailSent` (ASC), `last_communication_at` (ASC) | Follow-up email job |
+
+**Cloud Function Query Reference:**
+
+| Function | File | Query | Index Required? |
+|----------|------|-------|-----------------|
+| `sendFollowUpEmails` | `index.ts` | `leads` where `followUpEmailSent != true` AND `last_communication_at <= X` | ✅ Yes |
+| `sendAbandonedOnboardingEmails` | `index.ts` | `profiles` where `onboarded == false` AND `last_updated <= X` | ✅ Yes |
+| `sendMagicLink` | `callable.ts` | `profiles` where `email == X` | ❌ No (single field) |
+| `sendCompletionEmail` | `callable.ts` | `leads` where `email == X` | ❌ No (single field) |
+| `getUnmatchedUsers` | `matching.ts` | `profiles` where `matching_eligible == true` AND `group_id == null` [AND `location.city` AND `location.state_code`] | ⚠️ Maybe (depends on location filter) |
+
+**When You Need an Index:**
+- Queries with multiple `.where()` clauses on different fields
+- Queries combining `.where()` with `.orderBy()` on different fields
+- Queries using inequality operators (`!=`, `<`, `<=`, `>`, `>=`) with other filters
+
+**When You Don't Need an Index:**
+- Single `.where()` equality query (e.g., `.where('email', '==', value)`)
+- Queries only using `.orderBy()` on a single field
+- Queries filtered by document ID
+
+**Adding a New Index:**
+1. Add the index definition to `firestore.indexes.json`
+2. Deploy: `firebase deploy --only firestore:indexes`
+3. Wait for index to build (can take minutes for large collections)
+
+**If You See `FAILED_PRECONDITION: The query requires an index`:**
+1. The error message includes a direct link to create the index in Firebase Console
+2. Alternatively, add it to `firestore.indexes.json` and deploy
+3. Update this table in AGENTS.md when adding new indexed queries
+
 
 ## Important Implementation Details
 
 ### Gemini System Prompt
-The Gemini system prompt (`services/geminiService.ts` lines 22-95) is highly detailed and controls the agent's behavior:
+The Gemini system prompt (`services/geminiService.ts`) is highly detailed and controls the agent's behavior:
 - Enforces the onboarding step sequence
 - Specifies response tone and style
 - Defines how to handle multiple children (critical: capture ALL children in the array)
@@ -558,33 +671,7 @@ For TDD workflow:
 - **React Router**: Uses HashRouter for client-side routing (no server-side routing needed).
 - **No state management library**: Uses props drilling and local state. Consider adding if complexity grows.
 
-## Performance & Cost Considerations
-
-- Gemini API calls are optimized via context window management to reduce tokens
-- Firebase Firestore uses indexed queries for common patterns
-- Cloud Functions are rate-limited to 10 concurrent instances (set in index.ts)
-- Email sending uses Resend.com instead of Firebase Sendmail for better deliverability
-
 ## Troubleshooting
-
-**"GEMINI API key not found"**
-- Ensure `.env` file exists with `VITE_GEMINI_API_KEY` set
-- Restart dev server after adding .env
-- Check `console.log` output in dev tools
-
-**Firestore emulator not connecting**
-- Check that emulators are running: `npm run emulator` or `npm run dev:full`
-- Ensure Firestore emulator is running on port 8083
-- Verify `firebase.ts` has correct emulator configuration
-
-**Messages not persisting**
-- If using emulator, ensure data export is configured: `npm run emulator:seed`
-- Check Firestore browser console to verify collections exist
-
-**Email not sending**
-- Verify `RESEND_API_KEY` is correct and has production access
-- Check Cloud Functions logs: `firebase functions:log`
-- Test email service separately using `manual-test.ts`
 
 **Start script issues (Mac/Linux)**
 - Make sure script is executable: `chmod +x start-dev.sh`
@@ -604,6 +691,6 @@ For TDD workflow:
 
 # General coding guidlines
 
-Do not create commits and push unless explicitly asked. 
-
-
+DO NOT:
+- create commits and push unless explicitly asked. 
+- create summry md files unless asked

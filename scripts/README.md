@@ -39,6 +39,49 @@ If these environment variables are not set, the script will skip seeding and log
 
 ## Other Scripts
 
-- `seedTestUsers.ts` - Seeds test user data for matching algorithm testing
-- `cleanTestUsers.ts` - Removes test user data from the database
-- `readLogs.js` - Utility for reading application logs
+### setup-gemini-secret.sh
+
+Interactive setup script for configuring the Gemini API key for local development.
+
+**Purpose:**
+Securely configures the Gemini API key in Firebase Secrets for use with the Firebase Emulators.
+
+**Usage:**
+```bash
+./scripts/setup-gemini-secret.sh
+```
+
+**What it does:**
+1. Checks if you're in the project root directory
+2. Prompts for your Gemini API key (hidden input)
+3. Creates `functions/.secret.local` with the key
+4. Provides next steps for starting development
+
+**When to use:**
+- First time setting up the project
+- After cloning the repository
+- When rotating API keys
+
+**Security:**
+- The `.secret.local` file is automatically gitignored
+- Input is hidden while typing (secure prompt)
+- File is only readable by the current user
+
+**Get an API key:**
+Visit https://aistudio.google.com/app/apikey to get a free Gemini API key.
+
+**See also:**
+- `docs/QUICK_START_GEMINI.md` - Quick setup guide
+- `docs/GEMINI_API_SECURITY.md` - Complete security documentation
+
+### seedTestUsers.ts
+
+Seeds test user data for matching algorithm testing.
+
+### cleanTestUsers.ts
+
+Removes test user data from the database.
+
+### readLogs.js
+
+Utility for reading application logs.
