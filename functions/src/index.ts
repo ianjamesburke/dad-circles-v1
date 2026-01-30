@@ -151,17 +151,15 @@ export const sendWelcomeEmail = onDocumentCreated(
 );
 
 /**
- * Follow-up Email Function
+ * Follow-up Email Function (TEMPORARILY DISABLED)
  *
- * Scheduled to run daily at 10 AM UTC (adjust timezone as needed).
- * Sends follow-up emails to leads who received a welcome or abandonment email
- * 24+ hours ago and haven't received a follow-up email yet.
+ * Sends follow-up/nurture emails to leads 72+ hours after their last communication.
+ * Runs daily at 10 AM UTC.
  * 
- * Uses the unified `last_communication_at` field to simplify querying.
- * This field is set whenever a welcome-completed, welcome-abandoned, or
- * signup-other email is sent, allowing us to use a single query instead
- * of multiple queries with deduplication.
+ * Query: leads where followUpEmailSent != true AND last_communication_at <= 72hrs ago
+ * Index required: followUpEmailSent (ASC) + last_communication_at (ASC)
  */
+/*
 export const sendFollowUpEmails = onSchedule(
   {
     schedule: "0 10 * * *", // Daily at 10 AM UTC
@@ -175,14 +173,11 @@ export const sendFollowUpEmails = onSchedule(
 
       const db = admin.firestore();
       const now = Date.now();
-      const oneDayAgo = now - (24 * 60 * 60 * 1000); // 24 hours ago
+      const threeDaysAgo = now - (72 * 60 * 60 * 1000); // 72 hours ago
 
-      // Single unified query using last_communication_at
-      // This replaces the previous dual-query approach (welcomeEmailSent + abandonmentEmailSent)
-      // and eliminates the need for manual deduplication
       const leadsQuery = db.collection("leads")
-        .where("last_communication_at", "<=", oneDayAgo)
         .where("followUpEmailSent", "!=", true)
+        .where("last_communication_at", "<=", threeDaysAgo)
         .limit(50);
 
       const snapshot = await leadsQuery.get();
@@ -271,6 +266,7 @@ export const sendFollowUpEmails = onSchedule(
     }
   }
 );
+*/
 
 /**
  * Test function for development
