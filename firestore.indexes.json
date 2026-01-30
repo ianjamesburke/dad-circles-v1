@@ -45,6 +45,20 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "leads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "followUpEmailSent",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "last_communication_at",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []
