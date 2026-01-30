@@ -31,7 +31,7 @@ export const sendRealEmails = defineSecret("SEND_REAL_EMAILS");
 export { runMatching, seedData, approveGroup, deleteGroup, sendMagicLink, sendCompletionEmail, sendManualAbandonmentEmail } from "./callable";
 
 // Export Gemini AI Function
-export { getGeminiResponse } from "./gemini";
+export { getGeminiResponse } from "./gemini/index";
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
