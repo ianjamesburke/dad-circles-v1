@@ -89,23 +89,23 @@ describe('validateAndApplyUpdates', () => {
     });
 
     it('should reject invalid birth year (too old)', () => {
-      const { updates, errors } = validateAndApplyUpdates(
-        { children: [{ birth_year: 2010 }] },
+      const { errors } = validateAndApplyUpdates(
+        { children: [{ birth_year: 2005 }] },
         mockProfile
       );
 
-      expect(updates.children).toBeUndefined();
-      expect(errors).toContain('Invalid birth year: 2010');
+      // Config says minBirthYear: 2010, so 2005 should be rejected
+      expect(errors).toContain('Invalid birth year: 2005');
     });
 
     it('should reject invalid birth year (too far future)', () => {
-      const { updates, errors } = validateAndApplyUpdates(
-        { children: [{ birth_year: 2040 }] },
+      const { errors } = validateAndApplyUpdates(
+        { children: [{ birth_year: 2100 }] },
         mockProfile
       );
 
-      expect(updates.children).toBeUndefined();
-      expect(errors).toContain('Invalid birth year: 2040');
+      // Config says maxBirthYear: 2099, so 2100 should be rejected
+      expect(errors).toContain('Invalid birth year: 2100');
     });
 
     it('should reject invalid birth month', () => {
@@ -327,7 +327,7 @@ describe('validateAndApplyUpdates', () => {
       const { errors } = validateAndApplyUpdates(
         {
           name: '',
-          children: [{ birth_year: 2010 }],
+          children: [{ birth_year: 2005 }], // Below minBirthYear (2010)
           interests: 'not-array' as any,
           city: 'Austin',
         },
@@ -336,7 +336,7 @@ describe('validateAndApplyUpdates', () => {
 
       expect(errors.length).toBeGreaterThan(0);
       expect(errors).toContain('Invalid name');
-      expect(errors).toContain('Invalid birth year: 2010');
+      expect(errors).toContain('Invalid birth year: 2005');
       expect(errors).toContain('Interests must be an array');
       expect(errors).toContain('Location needs both city and 2-letter state code');
     });

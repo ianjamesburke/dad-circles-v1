@@ -55,8 +55,8 @@ export const CONFIG = {
   validation: {
     maxMessageLength: 1000,
     maxHistoryLength: 50,
-    minBirthYear: 2015,
-    maxBirthYear: 2035,
+    minBirthYear: 2010,
+    maxBirthYear: 2099,
     stateCodePattern: /^[A-Z]{2}$/,
   },
 
