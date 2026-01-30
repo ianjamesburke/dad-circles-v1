@@ -11,6 +11,7 @@ import { UserProfile, Message, OnboardingStep } from "../types";
 import { limitMessageContext } from "./contextManager";
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
+import { MAX_MESSAGE_LENGTH, getContextConfig } from '../config/contextConfig';
 
 const isDev = import.meta.env.DEV;
 
@@ -21,11 +22,22 @@ export const getAgentResponse = async (profile: UserProfile, history: Message[])
   const startTime = Date.now();
   if (isDev) console.log('🤖 [Gemini] Start (via Cloud Function)');
 
+  // Validate message length before sending (client-side check)
+  const lastMessage = history[history.length - 1];
+  if (lastMessage && lastMessage.content.length > MAX_MESSAGE_LENGTH) {
+    return {
+      message: `Your message is too long. Please keep it under ${MAX_MESSAGE_LENGTH} characters.`,
+      next_step: profile.onboarding_step,
+      profile_updates: {}
+    };
+  }
+
   // Limit message context to reduce payload size and cost
+  const contextConfig = getContextConfig('gemini-call');
   const limitedHistory = limitMessageContext(history, {
-    maxMessages: 30,
-    preserveFirst: 2,
-    preserveRecent: 28
+    maxMessages: contextConfig.maxMessages,
+    preserveFirst: contextConfig.preserveFirstCount,
+    preserveRecent: contextConfig.preserveRecentCount
   });
 
   try {

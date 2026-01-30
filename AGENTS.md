@@ -331,13 +331,64 @@ The system strictly follows a defined sequence of onboarding steps. The Gemini S
 
 The system is designed to extract user intent from natural language and progress through the state machine strictly (no skipping steps without explicit user confirmation).
 
-### Context Window Management
-Context management is critical for cost and quality. The `services/contextManager.ts` implements smart message slicing:
-- Recent messages are prioritized
-- Token counting estimates context size
-- Config in `config/contextConfig.ts` defines limits by onboarding step
+### Configuration Management
 
-This prevents overwhelming the Gemini API with unnecessary history while maintaining conversation state.
+**Centralized Configuration Files:**
+
+1. **`functions/src/config.ts`** - Backend configuration (Cloud Functions)
+   - Gemini API settings (model, timeout, temperature, tokens)
+   - Rate limiting rules (magic links, Gemini API)
+   - Validation constraints (message length, birth years, history length)
+   - UI-related settings
+
+2. **`config/contextConfig.ts`** - Client-side configuration
+   - Context window management per use case (chat, admin, gemini-call)
+   - Message length validation (must match backend)
+   - Message preservation strategies
+
+**Key Configuration Values:**
+
+```typescript
+// Backend (functions/src/config.ts)
+CONFIG = {
+  gemini: {
+    model: 'gemini-3-flash-preview',
+    timeout: 30,
+    maxOutputTokens: 512,
+    temperature: 0.4,
+  },
+  validation: {
+    maxMessageLength: 1000,      // Max chars per message
+    maxHistoryLength: 50,        // Max messages in history
+    minBirthYear: 2015,
+    maxBirthYear: 2035,
+  },
+  rateLimits: {
+    gemini: {
+      maxAttempts: 20,           // Per minute
+      windowMs: 60000,
+    },
+    magicLink: {
+      maxAttempts: 3,            // Per hour
+      windowMs: 3600000,
+    }
+  }
+}
+
+// Client (config/contextConfig.ts)
+contextConfigs = {
+  'gemini-call': {
+    maxMessages: 30,             // Sent to backend
+    preserveFirstCount: 2,
+    preserveRecentCount: 28,
+  }
+}
+```
+
+**Important Rules:**
+- Always use config values instead of hardcoding
+- Keep client `MAX_MESSAGE_LENGTH` in sync with backend `validation.maxMessageLength`
+- Context window management prevents overwhelming the Gemini API with unnecessary history while maintaining conversation state
 
 ### Firebase Emulator for Development
 The app supports Firebase emulators for local development (Firestore, Functions, Auth). The emulator can be started with `npm run emulator` or `npm run dev:full` for the complete development environment. Connection is configured in `firebase.ts` and automatically detects when running in emulator mode.

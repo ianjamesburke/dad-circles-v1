@@ -9,13 +9,12 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import { logger } from "./logger";
 import { RateLimiter } from "./rateLimiter";
+import { CONFIG } from "./config";
 import { GoogleGenAI, FunctionCallingConfigMode, Type, ThinkingLevel } from '@google/genai';
 import type { FunctionDeclaration, Content } from '@google/genai';
 
 // Define secret for Gemini API key
 const geminiApiKey = defineSecret("GEMINI_API_KEY");
-
-const MODEL_NAME = 'gemini-3-flash-preview';
 
 // ============================================================================
 // TOOL DECLARATIONS
@@ -199,7 +198,7 @@ const validateAndApply = (
     if (Array.isArray(args.children)) {
       const validChildren: any[] = [];
       for (const child of args.children) {
-        if (!child.birth_year || child.birth_year < 2015 || child.birth_year > 2035) {
+        if (!child.birth_year || child.birth_year < CONFIG.validation.minBirthYear || child.birth_year > CONFIG.validation.maxBirthYear) {
           errors.push(`Invalid birth year: ${child.birth_year}`);
           continue;
         }
@@ -306,7 +305,7 @@ export const getGeminiResponse = onCall(
   {
     cors: true,
     secrets: [geminiApiKey],
-    timeoutSeconds: 30,
+    timeoutSeconds: CONFIG.gemini.timeout,
   },
   async (request) => {
     const startTime = Date.now();
@@ -326,16 +325,16 @@ export const getGeminiResponse = onCall(
     if (!Array.isArray(history)) {
       throw new HttpsError('invalid-argument', 'history must be an array');
     }
-    if (history.length > 50) {
-      throw new HttpsError('invalid-argument', 'history too long (max 50 messages)');
+    if (history.length > CONFIG.validation.maxHistoryLength) {
+      throw new HttpsError('invalid-argument', `history too long (max ${CONFIG.validation.maxHistoryLength} messages)`);
     }
     // Validate each message in history
     for (const msg of history) {
       if (!msg.role || !msg.content) {
         throw new HttpsError('invalid-argument', 'invalid message format in history');
       }
-      if (typeof msg.content !== 'string' || msg.content.length > 1000) {
-        throw new HttpsError('invalid-argument', 'Message too long. Please keep your message under 1000 characters.');
+      if (typeof msg.content !== 'string' || msg.content.length > CONFIG.validation.maxMessageLength) {
+        throw new HttpsError('invalid-argument', `Message too long. Please keep your message under ${CONFIG.validation.maxMessageLength} characters.`);
       }
     }
 
@@ -371,7 +370,7 @@ export const getGeminiResponse = onCall(
 
       // Call Gemini API
       const response = await ai.models.generateContent({
-        model: MODEL_NAME,
+        model: CONFIG.gemini.model,
         contents,
         config: {
           systemInstruction: buildSystemPrompt(profile),
@@ -382,8 +381,8 @@ export const getGeminiResponse = onCall(
           thinkingConfig: {
             thinkingLevel: ThinkingLevel.MINIMAL
           },
-          temperature: 0.4,
-          maxOutputTokens: 512
+          temperature: CONFIG.gemini.temperature,
+          maxOutputTokens: CONFIG.gemini.maxOutputTokens
         }
       });
 
