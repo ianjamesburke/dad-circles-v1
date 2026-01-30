@@ -13,25 +13,29 @@ const CookiePolicy: React.FC = () => {
         checkMobile();
         window.addEventListener('resize', checkMobile);
 
-        // Load initial settings
+        // Load initial settings - supports both old JSON and new compact format
         const stored = localStorage.getItem('cookie-consent');
         if (stored) {
-            const settings = JSON.parse(stored);
-            setAnalyticsEnabled(settings.analytics);
-            setMarketingEnabled(settings.marketing);
+            if (stored.startsWith('{')) {
+                // Legacy JSON format
+                const settings = JSON.parse(stored);
+                setAnalyticsEnabled(settings.analytics);
+                setMarketingEnabled(settings.marketing);
+            } else {
+                // Compact format: "analytics,marketing,timestamp"
+                const [analytics, marketing] = stored.split(',');
+                setAnalyticsEnabled(analytics === '1');
+                setMarketingEnabled(marketing === '1');
+            }
         }
 
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
     const handleSave = () => {
-        const settings = {
-            essential: true,
-            analytics: analyticsEnabled,
-            marketing: marketingEnabled,
-            timestamp: Date.now(),
-        };
-        localStorage.setItem('cookie-consent', JSON.stringify(settings));
+        const a = analyticsEnabled ? '1' : '0';
+        const m = marketingEnabled ? '1' : '0';
+        localStorage.setItem('cookie-consent', `${a},${m},${Date.now()}`);
         setSaveStatus('Preferences saved successfully!');
         setTimeout(() => setSaveStatus(null), 3000);
     };

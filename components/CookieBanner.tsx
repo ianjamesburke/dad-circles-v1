@@ -3,37 +3,35 @@ import { Link } from 'react-router-dom';
 
 const CookieBanner: React.FC = () => {
     const [isVisible, setIsVisible] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
 
     useEffect(() => {
         const consent = localStorage.getItem('cookie-consent');
         if (!consent) {
             setIsVisible(true);
         }
+
+        const checkMobile = () => setIsMobile(window.innerWidth <= 600);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
     const handleAcceptAll = () => {
-        const settings = {
-            essential: true,
-            analytics: true,
-            marketing: true,
-            timestamp: Date.now(),
-        };
-        localStorage.setItem('cookie-consent', JSON.stringify(settings));
+        // Compact format: "a,m,t" where a=analytics, m=marketing, t=timestamp
+        // Values: 1=enabled, 0=disabled
+        localStorage.setItem('cookie-consent', `1,1,${Date.now()}`);
         setIsVisible(false);
     };
 
     const handleRejectNonEssential = () => {
-        const settings = {
-            essential: true,
-            analytics: false,
-            marketing: false,
-            timestamp: Date.now(),
-        };
-        localStorage.setItem('cookie-consent', JSON.stringify(settings));
+        localStorage.setItem('cookie-consent', `0,0,${Date.now()}`);
         setIsVisible(false);
     };
 
     if (!isVisible) return null;
+
+    const styles = getStyles(isMobile);
 
     return (
         <div style={styles.bannerWrapper}>
@@ -42,11 +40,11 @@ const CookieBanner: React.FC = () => {
                     <div style={styles.textGroup}>
                         <h4 style={styles.title}>Cookie Settings</h4>
                         <p style={styles.text}>
-                            We use cookies to improve your experience and analyze our traffic. By clicking "Accept All", you consent to our use of all cookies. You can manage your preferences in our <Link to="/cookies" style={styles.link}>Cookie Policy</Link>.
+                            We use cookies to improve your experience. <Link to="/cookies" style={styles.link}>Learn more</Link>
                         </p>
                     </div>
                     <div style={styles.buttonGroup}>
-                        <button onClick={handleRejectNonEssential} style={styles.secondaryButton}>Reject Non-Essential</button>
+                        <button onClick={handleRejectNonEssential} style={styles.secondaryButton}>Reject</button>
                         <button onClick={handleAcceptAll} style={styles.primaryButton}>Accept All</button>
                     </div>
                 </div>
@@ -55,44 +53,43 @@ const CookieBanner: React.FC = () => {
     );
 };
 
-const styles = {
+const getStyles = (isMobile: boolean) => ({
     bannerWrapper: {
         position: 'fixed' as const,
-        bottom: '24px',
-        left: '24px',
-        right: '24px',
+        bottom: isMobile ? '12px' : '24px',
+        left: isMobile ? '12px' : '24px',
+        right: isMobile ? '12px' : '24px',
         zIndex: 1000,
-        animation: 'slideUp 0.5s ease-out',
     },
     container: {
         maxWidth: '1200px',
         margin: '0 auto',
         background: '#ffffff',
-        borderRadius: '24px',
-        padding: '24px 32px',
+        borderRadius: isMobile ? '16px' : '24px',
+        padding: isMobile ? '16px' : '24px 32px',
         boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
         border: '1px solid #f1f5f9',
     },
     content: {
         display: 'flex',
+        flexDirection: isMobile ? 'column' as const : 'row' as const,
         justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: '32px',
-        flexWrap: 'wrap' as const,
+        alignItems: isMobile ? 'stretch' : 'center',
+        gap: isMobile ? '16px' : '32px',
     },
     textGroup: {
         flex: 1,
-        minWidth: '300px',
+        minWidth: isMobile ? 'auto' : '300px',
     },
     title: {
-        fontSize: '1.1rem',
+        fontSize: isMobile ? '1rem' : '1.1rem',
         fontWeight: 700,
         color: '#0f172a',
         marginBottom: '4px',
         margin: 0,
     },
     text: {
-        fontSize: '0.95rem',
+        fontSize: isMobile ? '0.85rem' : '0.95rem',
         color: '#64748b',
         lineHeight: 1.5,
         margin: 0,
@@ -104,30 +101,33 @@ const styles = {
     },
     buttonGroup: {
         display: 'flex',
-        gap: '12px',
+        gap: '10px',
+        width: isMobile ? '100%' : 'auto',
     },
     primaryButton: {
+        flex: isMobile ? 1 : 'none',
         background: '#0f172a',
         color: 'white',
-        padding: '12px 24px',
+        padding: isMobile ? '12px 16px' : '12px 24px',
         borderRadius: '100px',
-        fontSize: '0.95rem',
+        fontSize: isMobile ? '0.9rem' : '0.95rem',
         fontWeight: 600,
         border: 'none',
         cursor: 'pointer',
         whiteSpace: 'nowrap' as const,
     },
     secondaryButton: {
+        flex: isMobile ? 1 : 'none',
         background: '#f1f5f9',
         color: '#475569',
-        padding: '12px 24px',
+        padding: isMobile ? '12px 16px' : '12px 24px',
         borderRadius: '100px',
-        fontSize: '0.95rem',
+        fontSize: isMobile ? '0.9rem' : '0.95rem',
         fontWeight: 600,
         border: 'none',
         cursor: 'pointer',
         whiteSpace: 'nowrap' as const,
     },
-};
+});
 
 export default CookieBanner;
