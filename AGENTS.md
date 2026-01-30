@@ -417,33 +417,59 @@ The email system uses Resend template aliases for all emails. See `EMAIL_MIGRATI
 
 The `EmailService` class (`functions/src/emailService.ts`) handles Resend API calls with automatic simulation in emulator mode (unless `SEND_REAL_EMAILS=true`).
 
-## Environment Variables
+### Firestore Indexes
 
-> [!CAUTION]
-> **NEVER commit your actual `.env` file or any API keys to version control.**
+> [!IMPORTANT]
+> **When adding or modifying Firestore queries in Cloud Functions, check if a composite index is required.**
 
-Create a `.env` file in the root with:
+Firestore requires composite indexes for queries that filter or order on multiple fields. Single-field queries (e.g., `.where('email', '==', value)`) don't need indexes, but multi-field queries do.
 
-```
-# Gemini API
-VITE_GEMINI_API_KEY=your_gemini_api_key
+**Index Configuration:** `firestore.indexes.json`
 
-# Firebase (if not using emulator)
-VITE_FIREBASE_API_KEY=your_key
-VITE_FIREBASE_AUTH_DOMAIN=your_domain
-VITE_FIREBASE_PROJECT_ID=dad-circles
-VITE_FIREBASE_STORAGE_BUCKET=your_bucket
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_id
-VITE_FIREBASE_APP_ID=your_app_id
+**Current Indexes:**
 
-# Resend Email Service (for Cloud Functions)
-RESEND_API_KEY=your_resend_key
-```
+| Collection | Fields | Used By |
+|------------|--------|---------|
+| `messages` | `session_id` (ASC), `timestamp` (ASC) | Message history queries |
+| `profiles` | `onboarded` (ASC), `last_updated` (ASC) | Abandonment email job |
+| `leads` | `welcomeEmailSent` (ASC), `followUpEmailSent` (ASC), `timestamp` (ASC) | Legacy email tracking |
+| `leads` | `followUpEmailSent` (ASC), `last_communication_at` (ASC) | Follow-up email job |
+
+**Cloud Function Query Reference:**
+
+| Function | File | Query | Index Required? |
+|----------|------|-------|-----------------|
+| `sendFollowUpEmails` | `index.ts` | `leads` where `followUpEmailSent != true` AND `last_communication_at <= X` | ✅ Yes |
+| `sendAbandonedOnboardingEmails` | `index.ts` | `profiles` where `onboarded == false` AND `last_updated <= X` | ✅ Yes |
+| `sendMagicLink` | `callable.ts` | `profiles` where `email == X` | ❌ No (single field) |
+| `sendCompletionEmail` | `callable.ts` | `leads` where `email == X` | ❌ No (single field) |
+| `getUnmatchedUsers` | `matching.ts` | `profiles` where `matching_eligible == true` AND `group_id == null` [AND `location.city` AND `location.state_code`] | ⚠️ Maybe (depends on location filter) |
+
+**When You Need an Index:**
+- Queries with multiple `.where()` clauses on different fields
+- Queries combining `.where()` with `.orderBy()` on different fields
+- Queries using inequality operators (`!=`, `<`, `<=`, `>`, `>=`) with other filters
+
+**When You Don't Need an Index:**
+- Single `.where()` equality query (e.g., `.where('email', '==', value)`)
+- Queries only using `.orderBy()` on a single field
+- Queries filtered by document ID
+
+**Adding a New Index:**
+1. Add the index definition to `firestore.indexes.json`
+2. Deploy: `firebase deploy --only firestore:indexes`
+3. Wait for index to build (can take minutes for large collections)
+
+**If You See `FAILED_PRECONDITION: The query requires an index`:**
+1. The error message includes a direct link to create the index in Firebase Console
+2. Alternatively, add it to `firestore.indexes.json` and deploy
+3. Update this table in AGENTS.md when adding new indexed queries
+
 
 ## Important Implementation Details
 
 ### Gemini System Prompt
-The Gemini system prompt (`services/geminiService.ts` lines 22-95) is highly detailed and controls the agent's behavior:
+The Gemini system prompt (`services/geminiService.ts`) is highly detailed and controls the agent's behavior:
 - Enforces the onboarding step sequence
 - Specifies response tone and style
 - Defines how to handle multiple children (critical: capture ALL children in the array)
@@ -645,33 +671,7 @@ For TDD workflow:
 - **React Router**: Uses HashRouter for client-side routing (no server-side routing needed).
 - **No state management library**: Uses props drilling and local state. Consider adding if complexity grows.
 
-## Performance & Cost Considerations
-
-- Gemini API calls are optimized via context window management to reduce tokens
-- Firebase Firestore uses indexed queries for common patterns
-- Cloud Functions are rate-limited to 10 concurrent instances (set in index.ts)
-- Email sending uses Resend.com instead of Firebase Sendmail for better deliverability
-
 ## Troubleshooting
-
-**"GEMINI API key not found"**
-- Ensure `.env` file exists with `VITE_GEMINI_API_KEY` set
-- Restart dev server after adding .env
-- Check `console.log` output in dev tools
-
-**Firestore emulator not connecting**
-- Check that emulators are running: `npm run emulator` or `npm run dev:full`
-- Ensure Firestore emulator is running on port 8083
-- Verify `firebase.ts` has correct emulator configuration
-
-**Messages not persisting**
-- If using emulator, ensure data export is configured: `npm run emulator:seed`
-- Check Firestore browser console to verify collections exist
-
-**Email not sending**
-- Verify `RESEND_API_KEY` is correct and has production access
-- Check Cloud Functions logs: `firebase functions:log`
-- Test email service separately using `manual-test.ts`
 
 **Start script issues (Mac/Linux)**
 - Make sure script is executable: `chmod +x start-dev.sh`
@@ -691,6 +691,6 @@ For TDD workflow:
 
 # General coding guidlines
 
-Do not create commits and push unless explicitly asked. 
-
-
+DO NOT:
+- create commits and push unless explicitly asked. 
+- create summry md files unless asked
