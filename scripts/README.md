@@ -20,7 +20,7 @@ Automatically creates an admin user in Firebase Auth emulator on server start.
 5. Sets a custom claim `admin=true` for Firestore rules
 
 **Usage:**
-This script is no longer called automatically by `start-dev.sh`.
+This script is called automatically by `start-dev.sh` (used by `npm run dev:full`).
 
 You can also run it manually:
 ```bash
