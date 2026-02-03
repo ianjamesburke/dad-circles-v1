@@ -17,6 +17,7 @@ Automatically creates an admin user in Firebase Auth emulator on server start.
 2. Connects to Firebase Auth emulator (localhost:9099)
 3. Creates a new user with display name "admin" if it doesn't exist
 4. Updates the display name to "admin" if the user already exists
+5. Sets a custom claim `admin=true` for Firestore rules
 
 **Usage:**
 This script is no longer called automatically by `start-dev.sh`.
@@ -35,9 +36,29 @@ PRIMARY_ADMIN_PASSWORD=your_secure_password_here
 
 If these environment variables are not set, the script will skip seeding and log a warning message.
 
-**Note:** This only creates a Firebase Auth user with display name "admin". Admin users are handled separately from regular user profiles and don't need a Firestore profile entry.
+**Note:** This only creates a Firebase Auth user and sets the `admin=true` custom claim. Admin users are handled separately from regular user profiles and don't need a Firestore profile entry.
 
 ## Other Scripts
+
+### setAdminClaim.js
+
+Set the `admin=true` custom claim for one or more Firebase Auth users (production).
+
+**Usage:**
+```bash
+node scripts/setAdminClaim.js <uid-or-email> [more...]
+```
+
+**Examples:**
+```bash
+node scripts/setAdminClaim.js abcd1234efgh5678
+node scripts/setAdminClaim.js admin1@example.com admin2@example.com
+```
+
+**Auth:**
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/serviceAccount.json
+```
 
 ### setup-gemini-secret.sh
 

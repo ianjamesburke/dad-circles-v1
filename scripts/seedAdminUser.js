@@ -92,6 +92,13 @@ async function seedAdminUser() {
                 throw error;
             }
         }
+
+        // Ensure admin custom claim is set for Firestore rules
+        const hasAdminClaim = userRecord.customClaims?.admin === true;
+        if (!hasAdminClaim) {
+            await admin.auth().setCustomUserClaims(userRecord.uid, { admin: true });
+            console.log('   Set custom claim admin=true');
+        }
     } catch (error) {
         console.error('❌ Error seeding admin user:', error.message);
         process.exit(1);
