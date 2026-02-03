@@ -8,6 +8,7 @@
 
 import { initializeApp } from 'firebase/app';
 import { getFirestore, connectFirestoreEmulator, doc, setDoc } from 'firebase/firestore';
+import { getAuth, connectAuthEmulator, signInWithEmailAndPassword } from 'firebase/auth';
 
 // Define types locally
 interface Child {
@@ -44,14 +45,16 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
-// Connect to emulator
+// Connect to emulators
 if (process.env.NODE_ENV !== 'production') {
     try {
         connectFirestoreEmulator(db, 'localhost', 8083);
-        console.log('🔧 Connected to Firestore emulator');
+        connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+        console.log('🔧 Connected to Firestore and Auth emulators');
     } catch (error) {
-        console.log('⚠️ Firestore emulator already connected or not available');
+        console.log('⚠️ Emulators already connected or not available');
     }
 }
 
@@ -59,6 +62,11 @@ const seedIan = async () => {
     console.log('🌱 Seeding Ian...');
 
     try {
+        // Sign in as admin to have write permissions
+        console.log('🔐 Authenticating as admin...');
+        await signInWithEmailAndPassword(auth, 'ianjamesburke@gmail.com', 'admin123');
+        console.log('✅ Authenticated successfully');
+
         const profile: UserProfile = {
             session_id: 'test-session-ian',
             name: 'Ian',

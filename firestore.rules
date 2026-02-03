@@ -8,10 +8,18 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+
+    function isSessionOwner(sessionId) {
+      return request.auth != null && request.auth.uid == sessionId;
+    }
+
     // Admin Only: Groups
     // Only authenticated users (admins) can view or modify groups
     match /groups/{groupId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isAdmin();
     }
 
     // Leads:
@@ -21,25 +29,25 @@ service cloud.firestore {
     // - Delete: Admin only
     // TODO: Move lead creation to a Cloud Function for better security
     match /leads/{leadId} {
-      allow create, read, update: if true;
-      allow delete: if isAuthenticated();
+      allow read, write: if isAdmin();
     }
 
     // Profiles: Public (User Chat uses session IDs)
     // TODO: Implement anonymous auth for users to secure this
     match /profiles/{profileId} {
-      allow read, write: if true;
+      allow read, write: if isAdmin() || isSessionOwner(profileId);
     }
 
     // Messages: Public (User Chat)
     // TODO: Implement anonymous auth for users to secure this
     match /messages/{messageId} {
-      allow read, write: if true;
+      allow create: if isAdmin() || (request.auth != null && request.resource.data.session_id == request.auth.uid);
+      allow read, update, delete: if isAdmin() || (request.auth != null && resource.data.session_id == request.auth.uid);
     }
 
     // Default: Deny other collections
-    // match /{document=**} {
-    //   allow read, write: if false;
-    // }
+    match /{document=**} {
+      allow read, write: if false;
+    }
   }
 }

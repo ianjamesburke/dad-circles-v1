@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Dad Circles Development Start Script for Mac
-# This script starts Firebase emulators and the Vite dev server
+# Starts Firebase emulators and Functions build watcher (no seeding, no Vite)
 
 set -e  # Exit on error
 export FORCE_COLOR=1
 
-echo "🚀 Starting Dad Circles Development Environment..."
+echo "🚀 Starting Dad Circles Emulators..."
 echo ""
 
 # Colors for output
@@ -25,33 +25,19 @@ fi
 cleanup() {
     echo ""
     echo -e "${YELLOW}🧹 Cleaning up...${NC}"
-    
-    # Kill background processes
-    if [ ! -z "$EMULATOR_PID" ]; then
-        echo "Stopping Firebase emulators..."
-        kill $EMULATOR_PID 2>/dev/null || true
-    fi
-    
-    if [ ! -z "$VITE_PID" ]; then
-        echo "Stopping Vite dev server..."
-        kill $VITE_PID 2>/dev/null || true
-    fi
 
+    # Kill background processes
     if [ ! -z "$FUNCTIONS_BUILD_PID" ]; then
         echo "Stopping Functions watcher..."
         kill $FUNCTIONS_BUILD_PID 2>/dev/null || true
     fi
-    
-    # Kill any remaining Firebase emulator processes
-    pkill -f "firebase emulators" 2>/dev/null || true
-    pkill -f "java.*firestore" 2>/dev/null || true
-    
+
     echo -e "${GREEN}✅ Cleanup complete${NC}"
     exit 0
 }
 
-# Trap SIGINT (Ctrl+C) and SIGTERM
-trap cleanup SIGINT SIGTERM
+# Trap SIGINT (Ctrl+C), SIGTERM, and EXIT
+trap cleanup SIGINT SIGTERM EXIT
 
 # Check if node_modules exists
 if [ ! -d "node_modules" ]; then
@@ -60,94 +46,41 @@ if [ ! -d "node_modules" ]; then
     echo ""
 fi
 
-# Check if .env file exists
-if [ ! -f ".env" ]; then
-    echo -e "${YELLOW}⚠️  Warning: .env file not found${NC}"
-    echo "Creating .env from .env.example..."
-    if [ -f ".env.example" ]; then
-        cp .env.example .env
-        echo -e "${RED}⚠️  Please edit .env and add your API keys before continuing${NC}"
-        exit 1
-    else
-        echo -e "${RED}❌ .env.example not found. Please create .env manually${NC}"
-        exit 1
-    fi
+# Ensure functions dependencies exist
+if [ ! -d "functions/node_modules" ]; then
+    echo -e "${YELLOW}📦 Installing Functions dependencies...${NC}"
+    (cd functions && npm install)
+    echo ""
 fi
 
-# Clean up any existing emulator processes
-echo -e "${YELLOW}🧹 Cleaning up existing processes...${NC}"
-pkill -f "firebase emulators" 2>/dev/null || true
-pkill -f "java.*firestore" 2>/dev/null || true
-sleep 2
+# Free ports commonly used by Firebase emulators
+free_port() {
+    local port="$1"
+    local pids
+    pids=$(lsof -ti tcp:"$port" 2>/dev/null || true)
+    if [ -n "$pids" ]; then
+        echo -e "${YELLOW}🧹 Freeing port ${port} (PIDs: ${pids})...${NC}"
+        kill $pids 2>/dev/null || true
+        sleep 1
+    fi
+}
 
-pkill -f "java.*firestore" 2>/dev/null || true
-sleep 2
+free_port 4004   # Emulator UI
+free_port 9099   # Auth
+free_port 8083   # Firestore
+free_port 4400   # Emulator Hub
+free_port 4500   # Logging
 
 # Build functions first
 echo -e "${YELLOW}🔨 Building Cloud Functions...${NC}"
-(cd functions && npm install && npm run build)
+(cd functions && npm run build)
 
 # Start functions watcher in background
 echo -e "${YELLOW}👀 Starting Cloud Functions watcher...${NC}"
 (cd functions && npm run build:watch) > functions-build.log 2>&1 &
 FUNCTIONS_BUILD_PID=$!
 
-# Start Firebase emulators (Firestore + Functions + Auth) in background
+# Start Firebase emulators (Firestore + Functions + Auth) in the foreground
 echo -e "${GREEN}🔥 Starting Firebase emulators (Firestore + Functions + Auth)...${NC}"
-firebase emulators:start --only firestore,functions,auth > firebase-emulator.log 2>&1 &
-EMULATOR_PID=$!
-
-# Wait for emulators to be ready
-echo "Waiting for emulators to start..."
-sleep 5
-
-# Check if emulator is running
-if ! ps -p $EMULATOR_PID > /dev/null; then
-    echo -e "${RED}❌ Firebase emulator failed to start. Check firebase-emulator.log${NC}"
-    exit 1
-fi
-
-echo -e "${GREEN}✅ Firebase emulators running (PID: $EMULATOR_PID)${NC}"
-echo "   Firestore UI: http://127.0.0.1:4004/firestore"
-echo "   Emulator Hub: http://127.0.0.1:4004/"
-echo ""
-
-# Seed admin user (script has built-in retry logic)
-echo -e "${YELLOW}🔐 Seeding admin user...${NC}"
-node scripts/seedAdminUser.js
-echo ""
-
-# Seed Ian user
-echo -e "${YELLOW}🌱 Seeding user 'Ian'...${NC}"
-npx tsx scripts/seedIan.ts
-echo ""
-
-# Start Vite dev server in background
-echo -e "${GREEN}⚡ Starting Vite dev server...${NC}"
-npm run dev > vite-dev.log 2>&1 &
-VITE_PID=$!
-
-# Wait for Vite to be ready
-echo "Waiting for Vite to start..."
-sleep 3
-
-# Check if Vite is running
-if ! ps -p $VITE_PID > /dev/null; then
-    echo -e "${RED}❌ Vite dev server failed to start. Check vite-dev.log${NC}"
-    cleanup
-    exit 1
-fi
-
-echo -e "${GREEN}✅ Vite dev server running (PID: $VITE_PID)${NC}"
-echo "   App URL: http://localhost:3000/"
-echo ""
-
-echo -e "${GREEN}🎉 Development environment is ready!${NC}"
-echo ""
-echo -e "${YELLOW}Press Ctrl+C to stop all services${NC}"
-echo ""
-echo "📝 Streaming logs (Ctrl+C to stop)..."
-echo ""
-
-# Tail logs in the foreground, starting from the beginning of the files
-tail -f -n +1 firebase-emulator.log vite-dev.log
+echo -e "${YELLOW}Press Ctrl+C to stop emulators and the Functions watcher${NC}"
+firebase emulators:start --only firestore,functions,auth

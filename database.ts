@@ -9,6 +9,8 @@ import {
     sendMagicLink,
     sendCompletionEmail,
     sendManualAbandonmentEmail,
+    startSession,
+    redeemMagicLink,
 } from '@/services/callableService';
 import {
     getProfile,
@@ -96,6 +98,8 @@ export const database = {
     sendMagicLink,
     sendCompletionEmail,
     sendManualAbandonmentEmail,
+    startSession,
+    redeemMagicLink,
 };
 
 export { getLifeStageFromUser };

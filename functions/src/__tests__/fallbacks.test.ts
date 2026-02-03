@@ -21,12 +21,13 @@ describe('generateFallback', () => {
     expect(message).toContain('email');
   });
 
-  it('should ask for name when missing', () => {
+  it('should ask about children when name is missing', () => {
     const profile = {};
 
     const message = generateFallback(profile, {});
 
-    expect(message).toContain("What's your name");
+    expect(message).toContain('expecting');
+    expect(message).toContain('kids');
   });
 
   it('should ask about children when missing', () => {
@@ -147,8 +148,8 @@ describe('generateFallback', () => {
     expect(message).toContain('Location: Austin, TX');
   });
 
-  it('should ask for interests when empty array provided', () => {
-    // When interests is an empty array, it's treated as "missing"
+  it('should show summary when interests is an explicit empty array', () => {
+    // Empty array is treated as a valid "none"
     const profile = {
       name: 'John',
       children: [{ birth_year: 2020 }],
@@ -158,8 +159,8 @@ describe('generateFallback', () => {
 
     const message = generateFallback(profile, {});
 
-    // Should ask for interests, not show summary
-    expect(message).toContain('hobbies');
-    expect(message).toContain('interests');
+    expect(message).toContain('Name: John');
+    expect(message).toContain('Interests: None');
+    expect(message).toContain('Location: Austin, TX');
   });
 });

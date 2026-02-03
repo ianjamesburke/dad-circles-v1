@@ -50,6 +50,14 @@ export const CONFIG = {
   },
 
   /**
+   * Security settings
+   */
+  security: {
+    // Magic link token time-to-live (ms)
+    magicLinkTokenTtlMs: 24 * 60 * 60 * 1000, // 24 hours
+  },
+
+  /**
    * Validation constraints
    */
   validation: {

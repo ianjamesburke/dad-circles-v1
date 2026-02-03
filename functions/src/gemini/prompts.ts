@@ -51,7 +51,7 @@ const determineNextStep = (profile: UserProfile): { step: string; action: string
   
   const hasName = !!profile.name;
   const hasChildren = profile.children && profile.children.length > 0;
-  const hasInterests = profile.interests && profile.interests.length > 0;
+  const hasInterests = Array.isArray(profile.interests);
   const hasLocation = profile.location?.city && profile.location?.state_code;
   
   if (hasName && hasChildren && hasInterests && hasLocation) {
@@ -125,7 +125,7 @@ Answer questions about Dad Circles:
 - Activities: playdates, sports, coffee, outdoor stuff
 ` : `
 STRICT FLOW - FOLLOW THIS ORDER:
-1. NAME → Get their first name
+1. NAME → Ask for their first name (optional). If they decline, acknowledge once and move on.
 2. CHILDREN → Ask if expecting or have kids. Get birth/due year. Ask for month if they give age like "she's 3".
    IMPORTANT: After first child, ALWAYS ask "Do you have any other kids?" before moving on.
 3. INTERESTS → Ask about hobbies (hiking, gaming, sports, cooking, music, etc.)
@@ -139,6 +139,8 @@ CRITICAL RULES:
 - Do NOT skip siblings question - most dads have multiple kids
 - When showing confirmation, format it clearly with line breaks
 - Only set onboarded=true after user explicitly confirms
+- If user says they have no interests, set interests to an empty array and move on (do not ask again).
+- ALWAYS include a normal text reply to the user even if you call update_profile (never return only a tool call).
 
 Call update_profile whenever you learn new info. Include ALL children in the array (don't lose existing ones).
 `}`;

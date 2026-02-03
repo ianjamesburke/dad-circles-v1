@@ -2,6 +2,32 @@
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 
+export const startSession = async (
+  email: string,
+  postcode: string,
+  signupForOther: boolean
+): Promise<any> => {
+    try {
+      const startSessionFn = httpsCallable(functions, 'startSession');
+      const result = await startSessionFn({ email, postcode, signupForOther });
+      return result.data;
+    } catch (error) {
+      console.error('❌ Error starting session:', error);
+      throw error;
+    }
+};
+
+export const redeemMagicLink = async (token: string): Promise<any> => {
+    try {
+      const redeemFn = httpsCallable(functions, 'redeemMagicLink');
+      const result = await redeemFn({ token });
+      return result.data;
+    } catch (error) {
+      console.error('❌ Error redeeming magic link:', error);
+      throw error;
+    }
+};
+
 export const runMatchingAlgorithm = async (): Promise<any> => {
     try {
       const runMatchingFn = httpsCallable(functions, 'runMatching');

@@ -3,9 +3,11 @@ import { defineSecret } from "firebase-functions/params";
 import { logger } from "./logger";
 import * as admin from 'firebase-admin';
 import { FieldValue } from "firebase-admin/firestore";
+import crypto from "crypto";
 import { EmailService, EMAIL_TEMPLATES } from './emailService';
 import { getLocationFromPostcode, formatLocation } from './utils/location';
 import { generateMagicLink } from "./utils/link";
+import { createMagicLinkToken, redeemMagicLinkToken } from "./utils/magicLink";
 import { runMatchingAlgorithm, seedTestData, approveAndEmailGroup, deleteGroup as deleteGroupLogic } from "./matching";
 import { RateLimiter } from "./rateLimiter";
 import { maskEmail, maskPostcode } from "./utils/pii";
@@ -15,15 +17,26 @@ const resendApiKey = defineSecret("RESEND_API_KEY");
 const defaultFromEmail = defineSecret("DEFAULT_FROM_EMAIL");
 const sendRealEmails = defineSecret("SEND_REAL_EMAILS");
 
+const isAdmin = (auth: any): boolean => !!auth?.token?.admin;
+
+const requireAdmin = (request: any) => {
+  if (!request.auth || !isAdmin(request.auth)) {
+    throw new HttpsError('permission-denied', 'Admin privileges required.');
+  }
+};
+
+const requireAuth = (request: any) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Authentication required.');
+  }
+};
+
 /**
  * Callable function to run the matching algorithm
  * Can be called from the Admin Dashboard
  */
 export const runMatching = onCall({ cors: true }, async (request) => {
-    // Stricter admin auth check
-    if (!request.auth) {
-        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
-    }
+    requireAdmin(request);
 
     // V1 Spec: Test mode concept removed, always false
     const testMode = false;
@@ -94,8 +107,9 @@ export const sendMagicLink = onCall(
     return { success: true };
   }
 
-  // Generate magic link
-  const magicLink = generateMagicLink(profile.session_id);
+  // Generate one-time magic link token
+  const token = await createMagicLinkToken(profile.session_id, email);
+  const magicLink = generateMagicLink(token);
 
   // Get location string
   const locationInfo = await getLocationFromPostcode(profile.postcode);
@@ -127,6 +141,129 @@ export const sendMagicLink = onCall(
 });
 
 /**
+ * Start a new session or send a magic link for an existing one.
+ * This is the only entry point for the landing page.
+ */
+export const startSession = onCall(
+  {
+    cors: true,
+    secrets: [resendApiKey, defaultFromEmail, sendRealEmails],
+  },
+  async (request) => {
+    const { email, postcode } = request.data || {};
+    const signupForOther = Boolean(request.data?.signupForOther);
+
+    if (!email || !postcode) {
+      throw new HttpsError('invalid-argument', 'Email and postcode are required');
+    }
+
+    const normalizedEmail = String(email).toLowerCase();
+    const normalizedPostcode = String(postcode).trim();
+
+    const db = admin.firestore();
+
+    const leadQuery = db.collection('leads')
+      .where('email', '==', normalizedEmail)
+      .limit(1);
+    const leadSnap = await leadQuery.get();
+    const existingLead = leadSnap.empty ? undefined : leadSnap.docs[0];
+
+    if (existingLead?.data()?.session_id && !signupForOther) {
+      // Existing session - send magic link (rate limited)
+      const rateLimitCheck = await RateLimiter.checkMagicLinkRequest(normalizedEmail);
+      if (!rateLimitCheck.allowed) {
+        logger.warn('Magic link request blocked by rate limiter', {
+          email: maskEmail(normalizedEmail)
+        });
+        throw new HttpsError('resource-exhausted', rateLimitCheck.reason || 'Too many requests');
+      }
+
+      const sessionId = existingLead.data().session_id as string;
+      const token = await createMagicLinkToken(sessionId, normalizedEmail);
+      const magicLink = generateMagicLink(token);
+
+      const locationInfo = await getLocationFromPostcode(existingLead.data().postcode || normalizedPostcode);
+      const locationString = locationInfo
+        ? formatLocation(locationInfo.city, locationInfo.stateCode)
+        : (existingLead.data().postcode || normalizedPostcode);
+
+      await EmailService.sendTemplateEmail({
+        to: normalizedEmail,
+        templateId: EMAIL_TEMPLATES.RESUME_SESSION,
+        variables: { magic_link: magicLink, location: locationString }
+      });
+
+      return { status: 'magic_link_sent' };
+    }
+
+    // New session flow (or signup for other)
+    if (signupForOther) {
+      await db.collection('leads').add({
+        email: normalizedEmail,
+        postcode: normalizedPostcode,
+        signupForOther: true,
+        source: 'landing_page',
+        timestamp: FieldValue.serverTimestamp(),
+      });
+      return { status: 'signup_other_recorded' };
+    }
+
+    const sessionId = crypto.randomUUID();
+
+    const leadData = {
+      email: normalizedEmail,
+      postcode: normalizedPostcode,
+      signupForOther: false,
+      session_id: sessionId,
+      source: 'landing_page',
+      timestamp: FieldValue.serverTimestamp(),
+    };
+
+    if (existingLead) {
+      await existingLead.ref.set(leadData, { merge: true });
+    } else {
+      await db.collection('leads').add(leadData);
+    }
+
+    // Create profile
+    await db.collection('profiles').doc(sessionId).set({
+      session_id: sessionId,
+      email: normalizedEmail,
+      postcode: normalizedPostcode,
+      onboarded: false,
+      onboarding_step: 'welcome',
+      children: [],
+      last_updated: FieldValue.serverTimestamp(),
+      matching_eligible: false,
+    });
+
+    // Create a Firebase custom auth token tied to the session ID
+    const authToken = await admin.auth().createCustomToken(sessionId);
+
+    return { status: 'session_created', sessionId, authToken };
+  }
+);
+
+/**
+ * Redeem a magic link token and return a custom auth token for the session.
+ */
+export const redeemMagicLink = onCall({ cors: true }, async (request) => {
+  const { token } = request.data || {};
+  if (!token) {
+    throw new HttpsError('invalid-argument', 'Token is required');
+  }
+
+  try {
+    const { sessionId } = await redeemMagicLinkToken(String(token));
+    const authToken = await admin.auth().createCustomToken(sessionId);
+    return { sessionId, authToken };
+  } catch (error: any) {
+    logger.warn('Magic link redemption failed', { error: error?.message });
+    throw new HttpsError('failed-precondition', 'Magic link is invalid or expired');
+  }
+});
+
+/**
  * Send completion email when user finishes onboarding
  */
 export const sendCompletionEmail = onCall(
@@ -136,6 +273,11 @@ export const sendCompletionEmail = onCall(
   },
   async (request) => {
   const { email, sessionId } = request.data;
+
+  requireAuth(request);
+  if (!isAdmin(request.auth) && request.auth?.uid !== sessionId) {
+    throw new HttpsError('permission-denied', 'Not authorized for this session');
+  }
 
   if (!email || !sessionId) {
     throw new HttpsError('invalid-argument', 'Email and sessionId required');
@@ -162,6 +304,11 @@ export const sendCompletionEmail = onCall(
     return { success: false, message: 'Already sent or not onboarded' };
   }
 
+  const targetEmail = profile.email || String(email).toLowerCase();
+  if (!targetEmail) {
+    throw new HttpsError('invalid-argument', 'Email missing on profile');
+  }
+
   // Get location
   const locationInfo = await getLocationFromPostcode(profile.postcode);
   if (!locationInfo) {
@@ -176,7 +323,7 @@ export const sendCompletionEmail = onCall(
 
   // Send welcome-completed email
   const emailTemplate = {
-    to: email.toLowerCase(),
+    to: targetEmail,
     templateId: EMAIL_TEMPLATES.WELCOME_COMPLETED,
     variables: {
       location: locationString
@@ -197,7 +344,7 @@ export const sendCompletionEmail = onCall(
 
     // Update lead if exists
     const leadQuery = db.collection('leads')
-      .where('email', '==', email.toLowerCase())
+      .where('email', '==', targetEmail)
       .limit(1);
     const leadSnap = await leadQuery.get();
 
@@ -222,10 +369,7 @@ export const sendCompletionEmail = onCall(
  * ONLY works in development/emulator environment or if explicitly allowed
  */
 export const seedData = onCall({ cors: true }, async (request) => {
-    // Stricter admin auth check
-    if (!request.auth) {
-        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
-    }
+    requireAdmin(request);
 
     logger.info("Seed data called", { uid: request.auth?.uid });
 
@@ -247,9 +391,7 @@ export const approveGroup = onCall(
     secrets: [resendApiKey, defaultFromEmail, sendRealEmails],
   },
   async (request) => {
-    if (!request.auth) {
-        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
-    }
+    requireAdmin(request);
 
     const { groupId } = request.data;
     if (!groupId) {
@@ -271,9 +413,7 @@ export const approveGroup = onCall(
  * Callable function to delete a group
  */
 export const deleteGroup = onCall({ cors: true }, async (request) => {
-    if (!request.auth) {
-        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
-    }
+    requireAdmin(request);
 
     const { groupId } = request.data;
     if (!groupId) {
@@ -300,9 +440,7 @@ export const sendManualAbandonmentEmail = onCall(
     secrets: [resendApiKey, defaultFromEmail, sendRealEmails],
   },
   async (request) => {
-    if (!request.auth) {
-        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
-    }
+    requireAdmin(request);
 
     const { sessionId } = request.data;
     if (!sessionId) {
@@ -339,7 +477,8 @@ export const sendManualAbandonmentEmail = onCall(
         }
 
         // Generate magic link
-        const magicLink = generateMagicLink(profile.session_id);
+        const token = await createMagicLinkToken(profile.session_id, profile.email);
+        const magicLink = generateMagicLink(token);
 
         // Get location
         const locationInfo = await getLocationFromPostcode(profile.postcode);

@@ -1,13 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { db } from '../store';
 import { getAgentResponse } from '../services/callableGeminiService';
 import { Role, Message, OnboardingStep } from '../types';
 import { validateLLMResponse, logValidationFailure } from '../services/onboardingValidator';
+import { auth } from '../firebase';
+import { onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 
 export const UserChatInterface: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const sessionId = searchParams.get('session');
+  const navigate = useNavigate();
+  const tokenParam = searchParams.get('token');
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [authReady, setAuthReady] = useState(false);
 
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -18,6 +24,39 @@ export const UserChatInterface: React.FC = () => {
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const initializedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setSessionId(user.uid);
+        setSessionError(null);
+      } else {
+        setSessionId(null);
+      }
+      setAuthReady(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!tokenParam) return;
+
+    const redeem = async () => {
+      try {
+        const result = await db.redeemMagicLink(tokenParam);
+        if (!result?.authToken) {
+          throw new Error('Missing auth token');
+        }
+        await signInWithCustomToken(auth, result.authToken);
+        navigate('/chat', { replace: true });
+      } catch (error) {
+        console.error('Magic link redemption failed:', error);
+        setSessionError('This magic link is invalid or expired. Please request a new one.');
+      }
+    };
+
+    redeem();
+  }, [tokenParam, navigate]);
 
   const loadMessages = async (sid: string) => {
     try {
@@ -306,11 +345,21 @@ export const UserChatInterface: React.FC = () => {
 
   const isComplete = currentProfile?.onboarding_step === OnboardingStep.COMPLETE;
 
+  if (!authReady) {
+    return (
+      <div style={styles.errorContainer}>
+        <h2 style={styles.errorTitle}>Loading</h2>
+        <p style={styles.errorText}>Preparing your session...</p>
+      </div>
+    );
+  }
+
   if (!sessionId) {
+    const errorText = sessionError || 'Please start from the landing page to begin your onboarding.';
     return (
       <div style={styles.errorContainer}>
         <h2 style={styles.errorTitle}>Session Not Found</h2>
-        <p style={styles.errorText}>Please start from the landing page to begin your onboarding.</p>
+        <p style={styles.errorText}>{errorText}</p>
       </div>
     );
   }

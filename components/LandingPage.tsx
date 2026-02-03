@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { database } from '../database';
+import { signInWithCustomToken } from 'firebase/auth';
+import { auth } from '../firebase';
 import { BLOG_POSTS } from '../utils/blogData';
 import { getLocationFromPostcode } from '../utils/location';
 
@@ -35,58 +37,33 @@ const LandingPage: React.FC = () => {
     setErrorMessage('');
 
     try {
-      const existingLead = await database.getLeadByEmail(email);
+      const result = await database.startSession(email, postcode, signupForOther);
 
-      if (existingLead && existingLead.session_id && !signupForOther) {
-        try {
-          // Trigger magic link email with rate limiting
-          await database.sendMagicLink(email);
-          
-          setErrorMessage(
-            "We found an existing account with this email. Check your inbox - we've sent you a link to continue your session."
-          );
-        } catch (error: any) {
-          // Handle rate limit errors gracefully
-          if (error?.code === 'functions/resource-exhausted') {
-            setErrorMessage(error.message || 'Too many requests. Please try again later.');
-          } else {
-            setErrorMessage(
-              "We found an existing account with this email. If you don't receive an email, please try again in a few minutes."
-            );
-          }
-        }
-        
+      if (result?.status === 'magic_link_sent') {
+        setErrorMessage(
+          "Check your inbox - we've sent you a secure link to continue your session."
+        );
         setIsSubmitting(false);
         return;
       }
 
-      let sessionId: string | undefined;
-
-      if (!signupForOther) {
-        sessionId = crypto.randomUUID();
+      if (result?.status === 'signup_other_recorded') {
+        setShowSuccess(true);
+        setEmail('');
+        setPostcode('');
+        setSignupForOther(false);
+        setTimeout(() => setShowSuccess(false), 5000);
+        return;
       }
 
-      if (!existingLead) {
-        await database.addLead({
-          email,
-          postcode,
-          signupForOther,
-          session_id: sessionId,
-          source: 'landing_page'
-        });
-      } else if (sessionId && !existingLead.session_id) {
-        await database.updateLead(existingLead.id!, { session_id: sessionId });
-      }
-
-      if (!signupForOther && sessionId) {
-        await database.createProfile(sessionId, email, postcode);
+      if (result?.status === 'session_created' && result?.authToken) {
+        await signInWithCustomToken(auth, result.authToken);
 
         // Fetch and store location data immediately so it's available for the onboarding agent
-        // This avoids making API calls during the conversation
         try {
           const locationInfo = await getLocationFromPostcode(postcode);
-          if (locationInfo) {
-            await database.updateProfile(sessionId, {
+          if (locationInfo && result.sessionId) {
+            await database.updateProfile(result.sessionId, {
               location: {
                 city: locationInfo.city,
                 state_code: locationInfo.stateCode
@@ -95,23 +72,22 @@ const LandingPage: React.FC = () => {
           }
         } catch (error) {
           console.error('Error pre-fetching location:', error);
-          // Continue anyway - the agent will ask for location if missing
         }
+
+        navigate(`/chat`);
+        return;
       }
 
-      if (!signupForOther && sessionId) {
-        navigate(`/chat?session=${sessionId}`);
-      } else {
-        setShowSuccess(true);
-        setEmail('');
-        setPostcode('');
-        setSignupForOther(false);
-        setTimeout(() => setShowSuccess(false), 5000);
-      }
+      throw new Error('Unexpected response from server');
 
     } catch (error) {
       console.error('Error submitting lead:', error);
-      setErrorMessage('Something went wrong. Please try again.');
+      const err: any = error;
+      if (err?.code === 'functions/resource-exhausted') {
+        setErrorMessage(err.message || 'Too many requests. Please try again later.');
+      } else {
+        setErrorMessage('Something went wrong. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }

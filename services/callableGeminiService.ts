@@ -45,15 +45,6 @@ export const getAgentResponse = async (profile: UserProfile, history: Message[])
     const getGeminiResponseFn = httpsCallable(functions, 'getGeminiResponse');
     
     const result = await getGeminiResponseFn({
-      profile: {
-        session_id: profile.session_id,
-        name: profile.name,
-        children: profile.children,
-        interests: profile.interests,
-        location: profile.location,
-        onboarded: profile.onboarded,
-        onboarding_step: profile.onboarding_step
-      },
       history: limitedHistory.map(msg => ({
         role: msg.role,
         content: msg.content

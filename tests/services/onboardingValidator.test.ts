@@ -23,7 +23,7 @@ describe('onboardingValidator', () => {
       expect(result.canTransition).toBe(true);
     });
 
-    it('should fail validation when name is missing', () => {
+    it('should pass validation when name is missing but required fields exist', () => {
       const profile = createUserProfile({
         name: '',
         children: [createChildWithAge(6)],
@@ -32,8 +32,8 @@ describe('onboardingValidator', () => {
 
       const result = validateProfileCompleteness(profile);
 
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Name is required');
+      expect(result.isValid).toBe(true);
+      expect(result.errors).toHaveLength(0);
     });
 
     it('should fail validation when children are missing', () => {

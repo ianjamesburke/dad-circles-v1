@@ -82,9 +82,16 @@ export const validateAndApplyUpdates = (
   // Interests validation - array of strings
   if (args.interests !== undefined) {
     if (Array.isArray(args.interests)) {
-      updates.interests = args.interests
+      const normalized = args.interests
         .filter(i => typeof i === 'string' && i.trim())
         .map(i => i.trim());
+      const lower = normalized.map(i => i.toLowerCase());
+      const noneTokens = new Set(['none', 'no', 'nope', 'nah', 'n/a', 'na', 'nothing', 'no interests', 'no hobbies']);
+      if (normalized.length === 0 || (normalized.length === 1 && noneTokens.has(lower[0]))) {
+        updates.interests = [];
+      } else {
+        updates.interests = normalized;
+      }
     } else {
       errors.push('Interests must be an array');
     }
@@ -128,7 +135,6 @@ export const validateAndApplyUpdates = (
  */
 export const isProfileComplete = (profile: UserProfile): boolean => {
   return !!(
-    profile.name &&
     profile.children && profile.children.length > 0 &&
     profile.location?.city && profile.location?.state_code
   );

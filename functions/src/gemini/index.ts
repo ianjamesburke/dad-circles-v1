@@ -10,6 +10,7 @@ import { defineSecret } from "firebase-functions/params";
 import { logger } from "../logger";
 import { RateLimiter } from "../rateLimiter";
 import { CONFIG } from "../config";
+import * as admin from 'firebase-admin';
 import { GoogleGenAI, FunctionCallingConfigMode, ThinkingLevel } from '@google/genai';
 import type { Content } from '@google/genai';
 
@@ -41,20 +42,21 @@ export const getGeminiResponse = onCall(
   async (request) => {
     const startTime = Date.now();
     
-    const { profile, history } = request.data;
+    const { history } = request.data || {};
 
     // ========================================================================
     // INPUT VALIDATION
     // ========================================================================
     
-    if (!profile || !history) {
-      throw new HttpsError('invalid-argument', 'profile and history are required');
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'Authentication required');
     }
 
-    // Validate session_id exists for rate limiting
-    if (!profile.session_id) {
-      throw new HttpsError('invalid-argument', 'session_id is required');
+    if (!history) {
+      throw new HttpsError('invalid-argument', 'history is required');
     }
+
+    const sessionId = request.auth.uid;
 
     // Validate input size to prevent abuse and resource exhaustion
     if (!Array.isArray(history)) {
@@ -85,19 +87,28 @@ export const getGeminiResponse = onCall(
     // RATE LIMITING
     // ========================================================================
     
-    const rateLimitCheck = await RateLimiter.checkGeminiRequest(profile.session_id);
+    const rateLimitCheck = await RateLimiter.checkGeminiRequest(sessionId);
     if (!rateLimitCheck.allowed) {
       logger.warn('Gemini request rate limited', { 
-        sessionId: profile.session_id,
+        sessionId,
         reason: rateLimitCheck.reason 
       });
       throw new HttpsError('resource-exhausted', rateLimitCheck.reason || 'Rate limit exceeded');
     }
 
     logger.info('Gemini request received', { 
-      sessionId: profile.session_id,
+      sessionId,
       messageCount: history.length 
     });
+
+    const profileSnap = await admin.firestore().collection('profiles').doc(sessionId).get();
+    if (!profileSnap.exists) {
+      throw new HttpsError('not-found', 'Profile not found');
+    }
+    const profile = profileSnap.data();
+    if (!profile) {
+      throw new HttpsError('data-loss', 'Profile data missing');
+    }
 
     // ========================================================================
     // GEMINI API CALL
@@ -140,7 +151,7 @@ export const getGeminiResponse = onCall(
       });
 
       logger.info('Gemini response received', { 
-        sessionId: profile.session_id,
+        sessionId,
         duration: Date.now() - startTime 
       });
 
@@ -150,15 +161,17 @@ export const getGeminiResponse = onCall(
       
       // Process function calls and validate updates
       let allUpdates: any = {};
+      const validationErrors: string[] = [];
       
       if (response.functionCalls?.length) {
         for (const call of response.functionCalls) {
           if (call.name === 'update_profile' && call.args) {
-            const { updates } = validateAndApplyUpdates(
+            const { updates, errors } = validateAndApplyUpdates(
               call.args,
               { ...profile, ...allUpdates }
             );
             allUpdates = { ...allUpdates, ...updates };
+            if (errors.length) validationErrors.push(...errors);
           }
         }
       }
@@ -178,6 +191,11 @@ export const getGeminiResponse = onCall(
         textResponse = generateFallback(profile, allUpdates);
       }
 
+      // If model tried to complete but validation failed, override with a helpful prompt
+      if (validationErrors.includes('Cannot complete: missing required fields')) {
+        textResponse = generateFallback(profile, allUpdates);
+      }
+
       return {
         message: textResponse,
         profile_updates: allUpdates
@@ -186,7 +204,7 @@ export const getGeminiResponse = onCall(
     } catch (error: any) {
       logger.error('Gemini API error:', { 
         error: error.message,
-        sessionId: profile.session_id 
+        sessionId 
       });
       throw new HttpsError('internal', 'Failed to get AI response', error.message);
     }

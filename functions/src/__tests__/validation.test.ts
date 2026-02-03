@@ -243,7 +243,6 @@ describe('validateAndApplyUpdates', () => {
   describe('Onboarded flag validation', () => {
     it('should allow onboarding completion when profile is complete', () => {
       const completeProfile = {
-        name: 'John',
         children: [{ birth_year: 2020 }],
         location: { city: 'Austin', state_code: 'TX' },
       };
@@ -257,7 +256,7 @@ describe('validateAndApplyUpdates', () => {
       expect(errors).toHaveLength(0);
     });
 
-    it('should reject onboarding when missing name', () => {
+    it('should allow onboarding when name is missing but required fields exist', () => {
       const incompleteProfile = {
         children: [{ birth_year: 2020 }],
         location: { city: 'Austin', state_code: 'TX' },
@@ -268,8 +267,8 @@ describe('validateAndApplyUpdates', () => {
         incompleteProfile
       );
 
-      expect(updates.onboarded).toBeUndefined();
-      expect(errors).toContain('Cannot complete: missing required fields');
+      expect(updates.onboarded).toBe(true);
+      expect(errors).toHaveLength(0);
     });
 
     it('should reject onboarding when missing children', () => {
@@ -346,7 +345,6 @@ describe('validateAndApplyUpdates', () => {
 describe('isProfileComplete', () => {
   it('should return true for complete profile', () => {
     const profile = {
-      name: 'John',
       children: [{ birth_year: 2020 }],
       location: { city: 'Austin', state_code: 'TX' },
     };
@@ -354,13 +352,13 @@ describe('isProfileComplete', () => {
     expect(isProfileComplete(profile)).toBe(true);
   });
 
-  it('should return false when missing name', () => {
+  it('should return true when name is missing but other required fields exist', () => {
     const profile = {
       children: [{ birth_year: 2020 }],
       location: { city: 'Austin', state_code: 'TX' },
     };
 
-    expect(isProfileComplete(profile)).toBe(false);
+    expect(isProfileComplete(profile)).toBe(true);
   });
 
   it('should return false when missing children', () => {
@@ -375,7 +373,6 @@ describe('isProfileComplete', () => {
 
   it('should return false when missing location', () => {
     const profile = {
-      name: 'John',
       children: [{ birth_year: 2020 }],
     };
 

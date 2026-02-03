@@ -19,7 +19,7 @@ Automatically creates an admin user in Firebase Auth emulator on server start.
 4. Updates the display name to "admin" if the user already exists
 
 **Usage:**
-This script is automatically called by `start-dev.sh` after the Firebase emulators start.
+This script is no longer called automatically by `start-dev.sh`.
 
 You can also run it manually:
 ```bash

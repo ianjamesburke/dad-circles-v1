@@ -19,10 +19,6 @@ export interface ValidationResult {
 export const validateProfileCompleteness = (profile: UserProfile): ValidationResult => {
   const errors: string[] = [];
 
-  if (!profile.name || profile.name.trim() === '') {
-    errors.push('Name is required');
-  }
-
   if (!profile.children || profile.children.length === 0) {
     errors.push('At least one child is required');
   } else {

@@ -17,7 +17,6 @@ import { FieldValue } from "firebase-admin/firestore";
 import { logger, DebugLogger } from "./logger";
 import { EmailService, EMAIL_TEMPLATES } from "./emailService";
 import { getLocationFromPostcode, formatLocation } from "./utils/location";
-// import { generateMagicLink } from "./utils/link"; // Temporarily unused while abandonment cron is disabled
 // import { runDailyMatching } from "./matching"; // Temporarily unused while matching cron is disabled
 import { maskEmail, maskPostcode } from "./utils/pii";
 
@@ -28,7 +27,7 @@ export const defaultFromEmail = defineSecret("DEFAULT_FROM_EMAIL");
 export const sendRealEmails = defineSecret("SEND_REAL_EMAILS");
 
 // Export Callable Functions for Admin Dashboard
-export { runMatching, seedData, approveGroup, deleteGroup, sendMagicLink, sendCompletionEmail, sendManualAbandonmentEmail } from "./callable";
+export { runMatching, seedData, approveGroup, deleteGroup, sendMagicLink, sendCompletionEmail, sendManualAbandonmentEmail, startSession, redeemMagicLink } from "./callable";
 
 // Export Gemini AI Function
 export { getGeminiResponse } from "./gemini/index";
@@ -382,7 +381,8 @@ export const sendAbandonedOnboardingEmails = onSchedule(
 
         try {
           // Generate magic link
-           const magicLink = generateMagicLink(profile.session_id);
+          const token = await createMagicLinkToken(profile.session_id, profile.email);
+          const magicLink = generateMagicLink(token);
 
           // Get location
           const locationInfo = await getLocationFromPostcode(profile.postcode);
@@ -458,4 +458,3 @@ export const sendAbandonedOnboardingEmails = onSchedule(
 );
 // End of commented out function
 */
-

@@ -28,18 +28,15 @@ export const generateFallback = (profile: UserProfile, updates: any): string => 
     return "You're all set! We'll match you with a Dad Circle and send you an email soon. Feel free to ask me anything about how it works!";
   }
   
-  // Missing name
-  if (!merged.name) {
-    return "Hey! What's your name?";
-  }
-  
   // Missing children
   if (!merged.children?.length) {
-    return `Nice to meet you, ${merged.name}! Are you an expecting dad or do you already have kids?`;
+    return merged.name
+      ? `Nice to meet you, ${merged.name}! Are you an expecting dad or do you already have kids?`
+      : 'Are you an expecting dad or do you already have kids?';
   }
   
-  // Missing interests
-  if (!merged.interests?.length) {
+  // Missing interests (undefined only; empty array is a valid "none")
+  if (merged.interests === undefined) {
     return "What are some of your hobbies or interests? Things like hiking, gaming, cooking, sports - whatever you're into!";
   }
   
@@ -57,5 +54,6 @@ export const generateFallback = (profile: UserProfile, updates: any): string => 
     return `${isExp ? 'Expecting ' : ''}${date}${c.gender ? ` (${c.gender})` : ''}`;
   }).join(', ');
   
-  return `Here's what I have:\n\nName: ${merged.name}\nKids: ${kids}\nInterests: ${merged.interests?.join(', ') || 'None'}\nLocation: ${merged.location.city}, ${merged.location.state_code}\n\nLook good?`;
+  const nameLine = merged.name ? `Name: ${merged.name}\n` : '';
+  return `Here's what I have:\n\n${nameLine}Kids: ${kids}\nInterests: ${merged.interests?.join(', ') || 'None'}\nLocation: ${merged.location.city}, ${merged.location.state_code}\n\nLook good?`;
 };
