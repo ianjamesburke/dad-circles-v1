@@ -11,6 +11,8 @@ import {
   where,
   orderBy,
   serverTimestamp,
+  deleteDoc,
+  writeBatch,
 } from 'firebase/firestore';
 import { Lead } from '../types';
 
@@ -48,4 +50,36 @@ export const updateLead = async (leadId: string, updates: Partial<Lead>): Promis
     await setDoc(ref, updates, { merge: true });
     const snap = await getDoc(ref);
     return snap.data() as Lead;
+};
+
+export const deleteLeadsForUser = async (email?: string, sessionId?: string): Promise<void> => {
+    const deleteDocs = async (q: ReturnType<typeof query>) => {
+      const snap = await getDocs(q);
+      if (snap.empty) return;
+      let batch = writeBatch(db);
+      let count = 0;
+      for (const docSnap of snap.docs) {
+        batch.delete(docSnap.ref);
+        count += 1;
+        if (count >= 450) {
+          await batch.commit();
+          batch = writeBatch(db);
+          count = 0;
+        }
+      }
+      if (count > 0) {
+        await batch.commit();
+      }
+    };
+
+    const tasks: Promise<void>[] = [];
+    if (email) {
+      tasks.push(deleteDocs(query(leadsCol, where('email', '==', email.toLowerCase()))));
+    }
+    if (sessionId) {
+      tasks.push(deleteDocs(query(leadsCol, where('session_id', '==', sessionId))));
+    }
+    if (tasks.length > 0) {
+      await Promise.all(tasks);
+    }
 };

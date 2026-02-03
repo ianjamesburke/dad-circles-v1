@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
+import { signOut } from 'firebase/auth';
+import { auth } from '../../firebase';
 
 interface NavItem {
   path: string;
@@ -25,21 +27,38 @@ export const AdminLayout: React.FC = () => {
     return location.pathname.startsWith(path);
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 flex">
       {/* Sidebar */}
-      <aside className={`${sidebarCollapsed ? 'w-16' : 'w-64'} bg-slate-900 border-r border-slate-800 flex flex-col transition-all duration-200`}>
+      <aside className={`${sidebarCollapsed ? 'w-16' : 'w-72'} bg-slate-900 border-r border-slate-800 flex flex-col transition-all duration-200 flex-shrink-0 h-screen overflow-hidden`}>
         {/* Logo */}
-        <div className="p-4 border-b border-slate-800 flex items-center gap-3">
-          <div className="bg-blue-600 p-2 rounded-lg flex-shrink-0">
-            <i className="fas fa-users-rays text-white text-lg"></i>
-          </div>
-          {!sidebarCollapsed && (
-            <div>
-              <span className="text-lg font-bold text-white">Dad Circles</span>
-              <span className="block text-xs text-slate-500">Admin Panel</span>
+        <div className="p-4 border-b border-slate-800 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="bg-blue-600 p-2 rounded-lg flex-shrink-0">
+              <i className="fas fa-users-rays text-white text-lg"></i>
             </div>
-          )}
+            {!sidebarCollapsed && (
+              <div className="min-w-0">
+                <span className="text-lg font-bold text-white">Dad Circles</span>
+                <span className="block text-xs text-slate-500">Admin Panel</span>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="flex items-center justify-center w-9 h-9 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg transition"
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <i className={`fas ${sidebarCollapsed ? 'fa-chevron-right' : 'fa-chevron-left'}`}></i>
+          </button>
         </div>
 
         {/* Navigation */}
@@ -69,17 +88,6 @@ export const AdminLayout: React.FC = () => {
           ))}
         </nav>
 
-        {/* Collapse Toggle */}
-        <div className="p-3 border-t border-slate-800">
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg transition"
-          >
-            <i className={`fas ${sidebarCollapsed ? 'fa-chevron-right' : 'fa-chevron-left'}`}></i>
-            {!sidebarCollapsed && <span className="text-sm">Collapse</span>}
-          </button>
-        </div>
-
         {/* Back to App */}
         <div className="p-3 border-t border-slate-800">
           <Link
@@ -89,6 +97,17 @@ export const AdminLayout: React.FC = () => {
             <i className="fas fa-arrow-left w-5 text-center"></i>
             {!sidebarCollapsed && <span className="text-sm">Back to App</span>}
           </Link>
+        </div>
+
+        {/* Logout */}
+        <div className="p-3 border-t border-slate-800">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2 text-rose-400 hover:text-rose-200 hover:bg-rose-500/10 rounded-lg transition"
+          >
+            <i className="fas fa-right-from-bracket w-5 text-center"></i>
+            {!sidebarCollapsed && <span className="text-sm">Log Out</span>}
+          </button>
         </div>
       </aside>
 

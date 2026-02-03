@@ -14,6 +14,8 @@ export const AdminUserDetail: React.FC = () => {
   const [adminInput, setAdminInput] = useState('');
   const [sending, setSending] = useState(false);
   const [sendingAbandonmentEmail, setSendingAbandonmentEmail] = useState(false);
+  const [deletingUser, setDeletingUser] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [abandonmentEmailStatus, setAbandonmentEmailStatus] = useState<{
     message: string;
     type: 'success' | 'error';
@@ -85,6 +87,24 @@ export const AdminUserDetail: React.FC = () => {
     setSendingAbandonmentEmail(false);
   };
 
+  const handleDeleteUser = async () => {
+    if (!userId || deletingUser) return;
+    const label = profile?.email || userId;
+    const confirmed = window.confirm(`Delete user ${label}? This will delete all information associated with this user (profile, messages, and leads).`);
+    if (!confirmed) return;
+
+    setDeletingUser(true);
+    try {
+      await database.deleteUserData(userId);
+      setToast({ message: 'User deleted.', type: 'success' });
+      navigate('/admin/users');
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      setToast({ message: 'Failed to delete user.', type: 'error' });
+    }
+    setDeletingUser(false);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -109,6 +129,23 @@ export const AdminUserDetail: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {toast && (
+        <div className={`p-3 rounded-lg text-sm ${toast.type === 'success'
+          ? 'bg-green-500/10 border border-green-500/20 text-green-400'
+          : 'bg-red-500/10 border border-red-500/20 text-red-400'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span>{toast.message}</span>
+            <button
+              onClick={() => setToast(null)}
+              className="text-slate-400 hover:text-white text-xs"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
@@ -177,6 +214,14 @@ export const AdminUserDetail: React.FC = () => {
               >
                 <i className="fas fa-envelope"></i>
                 {sendingAbandonmentEmail ? 'Sending...' : 'Send Abandonment Email'}
+              </button>
+              <button
+                onClick={handleDeleteUser}
+                disabled={deletingUser}
+                className="w-full bg-rose-600 hover:bg-rose-700 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg font-medium transition flex items-center justify-center gap-2"
+              >
+                <i className="fas fa-trash"></i>
+                {deletingUser ? 'Deleting...' : 'Delete User'}
               </button>
               {abandonmentEmailStatus && (
                 <div className={`text-sm text-center p-2 rounded-lg ${

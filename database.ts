@@ -19,6 +19,7 @@ import {
     getAllProfiles,
     getUsersInGroup,
     updateUserGroupAssignment,
+    deleteUserData,
 } from '@/services/userService';
 import {
     addMessage,
@@ -30,6 +31,7 @@ import {
     getAllLeads,
     getLeadByEmail,
     updateLead,
+    deleteLeadsForUser,
 } from '@/services/leadService';
 import {
     createGroup,
@@ -67,6 +69,7 @@ export const database = {
     getAllLeads,
     getLeadByEmail,
     updateLead,
+    deleteLeadsForUser,
 
     // Groups
     createGroup,
@@ -84,6 +87,7 @@ export const database = {
     getUnmatchedUsers,
     getUsersInGroup,
     updateUserGroupAssignment,
+    deleteUserData,
     getMatchingStats,
 
     // Database management (dev/emulator only)

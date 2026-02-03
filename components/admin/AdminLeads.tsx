@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { database } from '../../database';
 import { Lead, UserProfile } from '../../types';
 
@@ -11,6 +12,7 @@ export const AdminLeads: React.FC = () => {
   const [leads, setLeads] = useState<LeadWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
 
   const loadLeads = async () => {
     setLoading(true);
@@ -180,7 +182,15 @@ export const AdminLeads: React.FC = () => {
               {filteredLeads.map(lead => {
                 const onboardingStatus = getOnboardingStatus(lead);
                 return (
-                  <tr key={lead.id} className="hover:bg-slate-800/50 transition">
+                  <tr
+                    key={lead.id}
+                    className={`hover:bg-slate-800/50 transition ${lead.profile?.session_id ? 'cursor-pointer' : ''}`}
+                    onClick={() => {
+                      if (lead.profile?.session_id) {
+                        navigate(`/admin/users/${lead.profile.session_id}`);
+                      }
+                    }}
+                  >
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center flex-shrink-0">

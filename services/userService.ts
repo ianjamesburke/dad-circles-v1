@@ -10,10 +10,15 @@ import {
   orderBy,
   where,
   serverTimestamp,
+  deleteDoc,
+  writeBatch,
 } from 'firebase/firestore';
 import { UserProfile, OnboardingStep } from '../types';
+import { getGroup, updateGroup } from './groupService';
+import { deleteLeadsForUser } from './leadService';
 
 const profilesCol = collection(db, 'profiles');
+const messagesCol = collection(db, 'messages');
 
 export const getProfile = async (sessionId: string): Promise<UserProfile | undefined> => {
   const ref = doc(profilesCol, sessionId);
@@ -77,4 +82,49 @@ export const updateUserGroupAssignment = async (sessionId: string, groupId: stri
     }
 
     await setDoc(ref, updates, { merge: true });
+};
+
+export const deleteUserData = async (sessionId: string): Promise<void> => {
+  const profile = await getProfile(sessionId);
+  if (!profile) return;
+
+  if (profile.group_id) {
+    const group = await getGroup(profile.group_id);
+    if (group) {
+      const updatedMemberIds = group.member_ids.filter((id) => id !== sessionId);
+      const updatedMemberEmails = profile.email
+        ? group.member_emails.filter((email) => email !== profile.email)
+        : group.member_emails;
+      const updatedEmailedMemberIds = group.emailed_member_ids.filter((id) => id !== sessionId);
+
+      await updateGroup(profile.group_id, {
+        member_ids: updatedMemberIds,
+        member_emails: updatedMemberEmails,
+        emailed_member_ids: updatedEmailedMemberIds,
+      });
+    }
+  }
+
+  await deleteLeadsForUser(profile.email, sessionId);
+
+  const messagesQuery = query(messagesCol, where('session_id', '==', sessionId));
+  const messagesSnap = await getDocs(messagesQuery);
+  let batch = writeBatch(db);
+  let count = 0;
+
+  for (const docSnap of messagesSnap.docs) {
+    batch.delete(docSnap.ref);
+    count += 1;
+    if (count >= 450) {
+      await batch.commit();
+      batch = writeBatch(db);
+      count = 0;
+    }
+  }
+
+  if (count > 0) {
+    await batch.commit();
+  }
+
+  await deleteDoc(doc(profilesCol, sessionId));
 };
