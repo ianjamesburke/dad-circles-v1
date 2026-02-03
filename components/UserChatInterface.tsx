@@ -14,6 +14,7 @@ export const UserChatInterface: React.FC = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [authPending, setAuthPending] = useState(false);
 
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -30,6 +31,7 @@ export const UserChatInterface: React.FC = () => {
       if (user) {
         setSessionId(user.uid);
         setSessionError(null);
+        setAuthPending(false);
       } else {
         setSessionId(null);
       }
@@ -43,6 +45,7 @@ export const UserChatInterface: React.FC = () => {
 
     const redeem = async () => {
       try {
+        setAuthPending(true);
         const result = await db.redeemMagicLink(tokenParam);
         if (!result?.authToken) {
           throw new Error('Missing auth token');
@@ -52,6 +55,7 @@ export const UserChatInterface: React.FC = () => {
       } catch (error) {
         console.error('Magic link redemption failed:', error);
         setSessionError('This magic link is invalid or expired. Please request a new one.');
+        setAuthPending(false);
       }
     };
 
@@ -345,7 +349,12 @@ export const UserChatInterface: React.FC = () => {
 
   const isComplete = currentProfile?.onboarding_step === OnboardingStep.COMPLETE;
 
-  if (!authReady) {
+  const showSessionLoading =
+    !authReady ||
+    authPending ||
+    (tokenParam && !sessionError && !sessionId);
+
+  if (showSessionLoading) {
     return (
       <div style={styles.errorContainer}>
         <h2 style={styles.errorTitle}>Loading</h2>
