@@ -375,10 +375,15 @@ export const UserChatInterface: React.FC = () => {
 
   return (
     <div style={styles.body}>
-      <div style={styles.logo}>
+      <button
+        type="button"
+        onClick={() => navigate('/')}
+        style={styles.logoButton}
+        aria-label="Dad Circles home"
+      >
         <div style={styles.logoSquare}>DC</div>
         <div style={styles.logoText}>DadCircles</div>
-      </div>
+      </button>
 
       <div style={styles.chatContainer}>
         <div ref={scrollRef} style={styles.messagesContainer}>
@@ -458,7 +463,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     margin: 0,
     overflow: 'hidden', // Prevent body from scrolling, only messages should scroll
   },
-  logo: {
+  logoButton: {
     position: 'sticky',
     top: 0,
     left: 0,
@@ -470,6 +475,9 @@ const styles: { [key: string]: React.CSSProperties } = {
     zIndex: 10,
     background: 'white',
     borderBottom: '1px solid #f1f5f9',
+    border: 'none',
+    cursor: 'pointer',
+    textAlign: 'left',
   },
   logoSquare: {
     width: '32px',

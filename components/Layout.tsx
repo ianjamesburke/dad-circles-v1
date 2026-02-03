@@ -7,12 +7,12 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
-        <div className="flex items-center gap-2">
+        <Link to="/" className="flex items-center gap-2" aria-label="Dad Circles home">
           <div className="bg-blue-600 p-2 rounded-lg">
             <i className="fas fa-users-rays text-white text-lg"></i>
           </div>
           <span className="text-xl font-bold tracking-tight text-slate-800">Dad Circles</span>
-        </div>
+        </Link>
         <nav className="flex gap-4">
           <Link 
             to="/" 

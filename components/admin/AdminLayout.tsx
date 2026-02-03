@@ -12,7 +12,6 @@ interface NavItem {
 
 export const AdminLayout: React.FC = () => {
   const location = useLocation();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const navItems: NavItem[] = [
     { path: '/admin', label: 'Overview', icon: 'fa-chart-line' },
@@ -38,27 +37,18 @@ export const AdminLayout: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-950 flex">
       {/* Sidebar */}
-      <aside className={`${sidebarCollapsed ? 'w-16' : 'w-72'} bg-slate-900 border-r border-slate-800 flex flex-col transition-all duration-200 flex-shrink-0 h-screen overflow-hidden`}>
+      <aside className="w-72 bg-slate-900 border-r border-slate-800 flex flex-col transition-all duration-200 flex-shrink-0 h-screen overflow-hidden">
         {/* Logo */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="bg-blue-600 p-2 rounded-lg flex-shrink-0">
               <i className="fas fa-users-rays text-white text-lg"></i>
             </div>
-            {!sidebarCollapsed && (
-              <div className="min-w-0">
-                <span className="text-lg font-bold text-white">Dad Circles</span>
-                <span className="block text-xs text-slate-500">Admin Panel</span>
-              </div>
-            )}
+            <div className="min-w-0">
+              <span className="text-lg font-bold text-white">Dad Circles</span>
+              <span className="block text-xs text-slate-500">Admin Panel</span>
+            </div>
           </div>
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="flex items-center justify-center w-9 h-9 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg transition"
-            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            <i className={`fas ${sidebarCollapsed ? 'fa-chevron-right' : 'fa-chevron-left'}`}></i>
-          </button>
         </div>
 
         {/* Navigation */}
@@ -74,16 +64,14 @@ export const AdminLayout: React.FC = () => {
               }`}
             >
               <i className={`fas ${item.icon} w-5 text-center`}></i>
-              {!sidebarCollapsed && (
-                <>
-                  <span className="font-medium">{item.label}</span>
-                  {item.badge !== undefined && item.badge > 0 && (
-                    <span className="ml-auto bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">
-                      {item.badge}
-                    </span>
-                  )}
-                </>
-              )}
+              <>
+                <span className="font-medium">{item.label}</span>
+                {item.badge !== undefined && item.badge > 0 && (
+                  <span className="ml-auto bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">
+                    {item.badge}
+                  </span>
+                )}
+              </>
             </Link>
           ))}
         </nav>
@@ -95,7 +83,7 @@ export const AdminLayout: React.FC = () => {
             className="flex items-center gap-3 px-3 py-2 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg transition"
           >
             <i className="fas fa-arrow-left w-5 text-center"></i>
-            {!sidebarCollapsed && <span className="text-sm">Back to App</span>}
+            <span className="text-sm">Back to App</span>
           </Link>
         </div>
 
@@ -106,7 +94,7 @@ export const AdminLayout: React.FC = () => {
             className="w-full flex items-center gap-3 px-3 py-2 text-rose-400 hover:text-rose-200 hover:bg-rose-500/10 rounded-lg transition"
           >
             <i className="fas fa-right-from-bracket w-5 text-center"></i>
-            {!sidebarCollapsed && <span className="text-sm">Log Out</span>}
+            <span className="text-sm">Log Out</span>
           </button>
         </div>
       </aside>
