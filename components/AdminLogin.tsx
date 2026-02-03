@@ -15,7 +15,9 @@ export const AdminLogin: React.FC = () => {
         setLoading(true);
         setError('');
         try {
-            await signInWithEmailAndPassword(auth, email, password);
+            const credential = await signInWithEmailAndPassword(auth, email, password);
+            // Ensure custom claims (admin=true) are present immediately after login.
+            await credential.user.getIdToken(true);
             navigate('/admin');
         } catch (error: any) {
             setError('Invalid email or password');

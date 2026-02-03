@@ -25,6 +25,9 @@ if (!PRIMARY_ADMIN_EMAIL || !PRIMARY_ADMIN_PASSWORD) {
     process.exit(0);
 }
 
+// Connect to Auth emulator (must be set before initializeApp)
+process.env.FIREBASE_AUTH_EMULATOR_HOST = 'localhost:9099';
+
 // Initialize Firebase Admin SDK for emulator
 if (!admin.apps.length) {
     admin.initializeApp({
@@ -32,10 +35,7 @@ if (!admin.apps.length) {
     });
 }
 
-// Connect to Auth emulator
-process.env.FIREBASE_AUTH_EMULATOR_HOST = 'localhost:9099';
-
-async function waitForEmulator(maxRetries = 30, delayMs = 1000) {
+async function waitForEmulator(maxRetries = 90, delayMs = 1000) {
     for (let i = 0; i < maxRetries; i++) {
         try {
             // Try to list users to check if emulator is ready

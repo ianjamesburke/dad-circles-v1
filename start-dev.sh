@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Dad Circles Development Start Script for Mac
-# Starts Firebase emulators and Functions build watcher (no seeding, no Vite)
+# Starts Firebase emulators, Functions build watcher, and admin seeding (no Vite)
 
 set -e  # Exit on error
 export FORCE_COLOR=1
@@ -30,6 +30,10 @@ cleanup() {
     if [ ! -z "$FUNCTIONS_BUILD_PID" ]; then
         echo "Stopping Functions watcher..."
         kill $FUNCTIONS_BUILD_PID 2>/dev/null || true
+    fi
+    if [ ! -z "$SEED_ADMIN_PID" ]; then
+        echo "Stopping admin seeding..."
+        kill $SEED_ADMIN_PID 2>/dev/null || true
     fi
 
     echo -e "${GREEN}✅ Cleanup complete${NC}"
@@ -83,4 +87,7 @@ FUNCTIONS_BUILD_PID=$!
 # Start Firebase emulators (Firestore + Functions + Auth) in the foreground
 echo -e "${GREEN}🔥 Starting Firebase emulators (Firestore + Functions + Auth)...${NC}"
 echo -e "${YELLOW}Press Ctrl+C to stop emulators and the Functions watcher${NC}"
+echo -e "${YELLOW}🔐 Seeding admin user in Auth emulator...${NC}"
+node scripts/seedAdminUser.js &
+SEED_ADMIN_PID=$!
 firebase emulators:start --only firestore,functions,auth
