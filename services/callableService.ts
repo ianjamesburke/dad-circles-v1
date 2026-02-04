@@ -11,7 +11,7 @@ export const startSession = async (
       console.info('startSession callable: invoking');
       const startSessionFn = httpsCallable(functions, 'startSession');
       const result = await startSessionFn({ email, postcode, signupForOther });
-      console.info('startSession callable: success', { status: result?.data?.status });
+      console.info('startSession callable: success', { status: (result?.data as any)?.status });
       return result.data;
     } catch (error) {
       console.error('❌ Error starting session:', error);
