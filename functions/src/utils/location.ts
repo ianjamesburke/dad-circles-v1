@@ -9,23 +9,28 @@ export interface LocationInfo {
   city: string;
   state: string;
   stateCode: string;
+  countryCode: string;
 }
 
 /**
- * Convert a US postcode (zip code) to city and state information
+ * Convert a postcode to city and state information (US/AU supported)
  *
- * @param postcode - US zip code (5 digits)
+ * @param postcode - Postcode (US 5 digits or AU 4 digits)
  * @returns LocationInfo object or null if lookup fails
  */
 export const getLocationFromPostcode = async (postcode: string): Promise<LocationInfo | null> => {
   try {
-    // Basic validation for US zip codes (5 digits)
-    const cleanPostcode = postcode.trim().substring(0, 5);
-    if (!/^\d{5}$/.test(cleanPostcode)) {
+    const normalized = postcode.trim().replace(/\s+/g, '');
+    const usMatch = normalized.match(/^\d{5}/);
+    const auMatch = normalized.match(/^\d{4}/);
+    const countryCode = usMatch ? 'US' : auMatch ? 'AU' : null;
+    const cleanPostcode = usMatch ? usMatch[0] : auMatch ? auMatch[0] : '';
+
+    if (!countryCode || !cleanPostcode) {
       return null;
     }
 
-    const response = await fetch(`https://api.zippopotam.us/us/${cleanPostcode}`);
+    const response = await fetch(`https://api.zippopotam.us/${countryCode.toLowerCase()}/${cleanPostcode}`);
 
     if (!response.ok) {
       return null;
@@ -35,10 +40,12 @@ export const getLocationFromPostcode = async (postcode: string): Promise<Locatio
 
     if (data.places && data.places.length > 0) {
       const place = data.places[0];
+      const stateCode = place['state abbreviation'] || place['state'] || '';
       return {
         city: place['place name'],
         state: place['state'],
-        stateCode: place['state abbreviation']
+        stateCode,
+        countryCode,
       };
     }
 
@@ -56,6 +63,9 @@ export const getLocationFromPostcode = async (postcode: string): Promise<Locatio
  * @param stateCode - Two-letter state code
  * @returns Formatted location string (e.g., "Austin, TX")
  */
-export const formatLocation = (city: string, stateCode: string): string => {
+export const formatLocation = (city: string, stateCode: string, countryCode?: string): string => {
+  if (countryCode && countryCode.toUpperCase() !== 'US') {
+    return `${city}, ${stateCode}, ${countryCode.toUpperCase()}`;
+  }
   return `${city}, ${stateCode}`;
 };

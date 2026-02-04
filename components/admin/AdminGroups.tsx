@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { database } from '../../database';
 import { Group, UserProfile } from '../../types';
+import { formatLocationDisplay } from '../../utils/location';
 import { formatChildInfo } from '../../utils/childDisplay';
 
 type TabType = 'pending' | 'active';
@@ -229,7 +230,7 @@ export const AdminGroups: React.FC = () => {
                     <div className="flex-1 min-w-0">
                       <h3 className="text-white font-medium">{group.name}</h3>
                       <p className="text-slate-500 text-sm">
-                        {group.location.city}, {group.location.state_code} • {group.life_stage} • {group.member_ids.length} members
+                        {(formatLocationDisplay(group.location) || `${group.location.city}, ${group.location.state_code}`)} • {group.life_stage} • {group.member_ids.length} members
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -286,7 +287,7 @@ export const AdminGroups: React.FC = () => {
                                 {member.email || 'No email'}
                               </p>
                               <p className="text-slate-500 text-xs mt-1">
-                                {member.location ? `${member.location.city}, ${member.location.state_code}` : 'No location'}
+                                {formatLocationDisplay(member.location) || 'No location'}
                               </p>
                               {member.children && member.children.length > 0 && (
                                 <p className="text-slate-500 text-xs mt-1">

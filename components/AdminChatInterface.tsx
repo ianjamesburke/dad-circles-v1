@@ -93,7 +93,7 @@ export const AdminChatInterface: React.FC = () => {
       await db.addMessage({
         session_id: sid,
         role: Role.AGENT,
-        content: "Hey there! So glad you're here. First things first, what's your name?"
+        content: "Hey, thanks for joining Dad Circles. Excited that you're here. First of all, what's your name? And then are you a current or an expecting dad?"
       });
       
       // Update profile to NAME step since we asked the question

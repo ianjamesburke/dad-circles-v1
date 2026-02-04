@@ -32,12 +32,7 @@ export const validateProfileCompleteness = (profile: UserProfile): ValidationRes
     });
   }
 
-  if (
-    !profile.location ||
-    !profile.location.city ||
-    !profile.location.state_code ||
-    profile.location_confirmed !== true
-  ) {
+  if (!profile.location || !profile.location.city || !profile.location.state_code) {
     errors.push('Location (city and state/region) is required');
   }
   if (profile.location?.country_code && !/^[A-Z]{2}$/.test(profile.location.country_code.toUpperCase())) {

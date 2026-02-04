@@ -22,7 +22,7 @@ function createTestConversation(size: number): Message[] {
 
   // First few messages (onboarding start)
   const startMessages = [
-    ['agent', "Hey there! So glad you're here. To get started, are you an expecting dad or a current dad?"],
+    ['agent', "Hey, thanks for joining Dad Circles. Excited that you're here. First of all, what's your name? And then are you a current or an expecting dad?"],
     ['user', "I'm an expecting dad"],
     ['agent', "That's so exciting! When is your baby due?"],
     ['user', "June 2025"],

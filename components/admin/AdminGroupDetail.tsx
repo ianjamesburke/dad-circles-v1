@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { database } from '../../database';
 import { Group, UserProfile } from '../../types';
+import { formatLocationDisplay } from '../../utils/location';
 import { formatChildDate, isExpecting } from '../../utils/childDisplay';
 
 export const AdminGroupDetail: React.FC = () => {
@@ -125,7 +126,7 @@ export const AdminGroupDetail: React.FC = () => {
         <div className="flex-1">
           <h1 className="text-xl font-semibold text-white">{group.name}</h1>
           <p className="text-slate-500 text-sm">
-            {group.location.city}, {group.location.state_code} • {group.life_stage}
+            {(formatLocationDisplay(group.location) || `${group.location.city}, ${group.location.state_code}`)} • {group.life_stage}
           </p>
         </div>
         <span className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
@@ -157,7 +158,7 @@ export const AdminGroupDetail: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Location</p>
-                <p className="text-white">{group.location.city}, {group.location.state_code}</p>
+                <p className="text-white">{formatLocationDisplay(group.location) || `${group.location.city}, ${group.location.state_code}`}</p>
               </div>
               <div>
                 <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Life Stage</p>
@@ -272,7 +273,7 @@ export const AdminGroupDetail: React.FC = () => {
                       {member.email || 'No email'}
                     </p>
                     <p className="text-slate-500 text-sm mt-1">
-                      {member.location ? `${member.location.city}, ${member.location.state_code}` : 'No location'}
+                      {formatLocationDisplay(member.location) || 'No location'}
                     </p>
                     {member.children && member.children.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2">

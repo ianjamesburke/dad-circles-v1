@@ -12,6 +12,7 @@ interface TestUserConfig {
   email: string;
   city: string;
   stateCode: string;
+  countryCode: string;
   childType: 'expecting' | 'existing';
   birthMonth: number;
   birthYear: number;
@@ -19,14 +20,14 @@ interface TestUserConfig {
 }
 
 const CITIES = [
-  { city: 'San Francisco', stateCode: 'CA' },
-  { city: 'Austin', stateCode: 'TX' },
-  { city: 'New York', stateCode: 'NY' },
-  { city: 'Seattle', stateCode: 'WA' },
-  { city: 'Denver', stateCode: 'CO' },
-  { city: 'Chicago', stateCode: 'IL' },
-  { city: 'Los Angeles', stateCode: 'CA' },
-  { city: 'Portland', stateCode: 'OR' },
+  { city: 'San Francisco', stateCode: 'CA', countryCode: 'US' },
+  { city: 'Austin', stateCode: 'TX', countryCode: 'US' },
+  { city: 'New York', stateCode: 'NY', countryCode: 'US' },
+  { city: 'Seattle', stateCode: 'WA', countryCode: 'US' },
+  { city: 'Denver', stateCode: 'CO', countryCode: 'US' },
+  { city: 'Chicago', stateCode: 'IL', countryCode: 'US' },
+  { city: 'Los Angeles', stateCode: 'CA', countryCode: 'US' },
+  { city: 'Portland', stateCode: 'OR', countryCode: 'US' },
 ];
 
 const INTERESTS = [
@@ -42,6 +43,7 @@ const PRESETS: TestUserPreset[] = [
       email: '',
       city: 'San Francisco',
       stateCode: 'CA',
+      countryCode: 'US',
       childType: 'expecting',
       birthMonth: new Date().getMonth() + 4 > 12 ? (new Date().getMonth() + 4) - 12 : new Date().getMonth() + 4,
       birthYear: new Date().getMonth() + 4 > 12 ? new Date().getFullYear() + 1 : new Date().getFullYear(),
@@ -55,6 +57,7 @@ const PRESETS: TestUserPreset[] = [
       email: '',
       city: 'Austin',
       stateCode: 'TX',
+      countryCode: 'US',
       childType: 'existing',
       birthMonth: new Date().getMonth() - 2 <= 0 ? 12 + (new Date().getMonth() - 2) : new Date().getMonth() - 2,
       birthYear: new Date().getMonth() - 2 <= 0 ? new Date().getFullYear() - 1 : new Date().getFullYear(),
@@ -68,6 +71,7 @@ const PRESETS: TestUserPreset[] = [
       email: '',
       city: 'New York',
       stateCode: 'NY',
+      countryCode: 'US',
       childType: 'existing',
       birthMonth: new Date().getMonth() - 10 <= 0 ? 12 + (new Date().getMonth() - 10) : new Date().getMonth() - 10,
       birthYear: new Date().getMonth() - 10 <= 0 ? new Date().getFullYear() - 1 : new Date().getFullYear(),
@@ -81,6 +85,7 @@ const PRESETS: TestUserPreset[] = [
       email: '',
       city: 'Seattle',
       stateCode: 'WA',
+      countryCode: 'US',
       childType: 'existing',
       birthMonth: new Date().getMonth(),
       birthYear: new Date().getFullYear() - 2,
@@ -98,6 +103,7 @@ export const AdminTools: React.FC = () => {
     email: '',
     city: 'San Francisco',
     stateCode: 'CA',
+    countryCode: 'US',
     childType: 'expecting',
     birthMonth: new Date().getMonth() + 3,
     birthYear: new Date().getFullYear(),
@@ -107,6 +113,7 @@ export const AdminTools: React.FC = () => {
   // Batch generation
   const [batchCity, setBatchCity] = useState('San Francisco');
   const [batchStateCode, setBatchStateCode] = useState('CA');
+  const [batchCountryCode, setBatchCountryCode] = useState('US');
   const [batchCount, setBatchCount] = useState(5);
 
   const generateSessionId = () => `test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -130,6 +137,7 @@ export const AdminTools: React.FC = () => {
       location: {
         city: config.city,
         state_code: config.stateCode,
+        country_code: config.countryCode,
       },
       children: [{
         type: config.childType,
@@ -218,6 +226,7 @@ export const AdminTools: React.FC = () => {
           email: generateEmail(`batch${i + 1}_`),
           city: batchCity,
           stateCode: batchStateCode,
+          countryCode: batchCountryCode,
           childType,
           birthMonth,
           birthYear,
@@ -226,7 +235,10 @@ export const AdminTools: React.FC = () => {
         created.push(user.email);
       }
       
-      setResult(`✅ Created ${created.length} test users in ${batchCity}, ${batchStateCode}`);
+      const locationLabel = batchCountryCode && batchCountryCode !== 'US'
+        ? `${batchCity}, ${batchStateCode}, ${batchCountryCode}`
+        : `${batchCity}, ${batchStateCode}`;
+      setResult(`✅ Created ${created.length} test users in ${locationLabel}`);
     } catch (error) {
       setResult(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -321,16 +333,17 @@ export const AdminTools: React.FC = () => {
               <div>
                 <label className="text-slate-400 text-xs uppercase tracking-wider block mb-1">City</label>
                 <select
-                  value={`${batchCity}|${batchStateCode}`}
+                  value={`${batchCity}|${batchStateCode}|${batchCountryCode}`}
                   onChange={(e) => {
-                    const [city, state] = e.target.value.split('|');
+                    const [city, state, country] = e.target.value.split('|');
                     setBatchCity(city);
                     setBatchStateCode(state);
+                    setBatchCountryCode(country || 'US');
                   }}
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                 >
                   {CITIES.map(loc => (
-                    <option key={`${loc.city}|${loc.stateCode}`} value={`${loc.city}|${loc.stateCode}`}>
+                    <option key={`${loc.city}|${loc.stateCode}|${loc.countryCode}`} value={`${loc.city}|${loc.stateCode}|${loc.countryCode}`}>
                       {loc.city}, {loc.stateCode}
                     </option>
                   ))}
@@ -385,15 +398,15 @@ export const AdminTools: React.FC = () => {
           <div>
             <label className="text-slate-400 text-xs uppercase tracking-wider block mb-1">Location</label>
             <select
-              value={`${formData.city}|${formData.stateCode}`}
+              value={`${formData.city}|${formData.stateCode}|${formData.countryCode}`}
               onChange={(e) => {
-                const [city, state] = e.target.value.split('|');
-                setFormData(prev => ({ ...prev, city, stateCode: state }));
+                const [city, state, country] = e.target.value.split('|');
+                setFormData(prev => ({ ...prev, city, stateCode: state, countryCode: country || 'US' }));
               }}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
             >
               {CITIES.map(loc => (
-                <option key={`${loc.city}|${loc.stateCode}`} value={`${loc.city}|${loc.stateCode}`}>
+                <option key={`${loc.city}|${loc.stateCode}|${loc.countryCode}`} value={`${loc.city}|${loc.stateCode}|${loc.countryCode}`}>
                   {loc.city}, {loc.stateCode}
                 </option>
               ))}

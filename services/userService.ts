@@ -35,6 +35,7 @@ export const createProfile = async (sessionId: string, email?: string, postcode?
     onboarded: false,
     onboarding_step: OnboardingStep.WELCOME,
     children: [],
+    children_complete: false,
     last_updated: serverTimestamp() as any,
     matching_eligible: false, // Default to false until onboarding is complete
   };

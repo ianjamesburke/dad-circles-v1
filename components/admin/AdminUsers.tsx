@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { database } from '../../database';
 import { UserProfile } from '../../types';
+import { formatLocationDisplay } from '../../utils/location';
 import { formatChildInfo } from '../../utils/childDisplay';
 
 type FilterStatus = 'all' | 'onboarded' | 'in_progress' | 'matched' | 'unmatched';
@@ -40,8 +41,8 @@ export const AdminUsers: React.FC = () => {
 
   // Get unique locations for filter
   const locations = [...new Set(profiles
-    .filter(p => p.location)
-    .map(p => `${p.location!.city}, ${p.location!.state_code}`)
+    .map(p => formatLocationDisplay(p.location))
+    .filter((loc): loc is string => !!loc)
   )].sort();
 
   // Filter profiles
@@ -64,7 +65,7 @@ export const AdminUsers: React.FC = () => {
 
     // Location filter
     if (filterLocation !== 'all') {
-      const profileLocation = profile.location ? `${profile.location.city}, ${profile.location.state_code}` : '';
+      const profileLocation = formatLocationDisplay(profile.location) || '';
       if (profileLocation !== filterLocation) return false;
     }
 
@@ -339,7 +340,7 @@ export const AdminUsers: React.FC = () => {
                   </td>
                   <td className="px-4 py-4">
                     <p className="text-slate-300 text-sm">
-                      {profile.location ? `${profile.location.city}, ${profile.location.state_code}` : '—'}
+                      {formatLocationDisplay(profile.location) || '—'}
                     </p>
                   </td>
                   <td className="px-4 py-4">

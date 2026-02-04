@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { database } from '../../database';
 import { UserProfile, Message, Role, Group } from '../../types';
+import { formatLocationDisplay } from '../../utils/location';
 import { formatChildDate, isExpecting } from '../../utils/childDisplay';
 
 export const AdminUserDetail: React.FC = () => {
@@ -183,7 +184,7 @@ export const AdminUserDetail: React.FC = () => {
               <div>
                 <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Location</p>
                 <p className="text-white">
-                  {profile.location ? `${profile.location.city}, ${profile.location.state_code}` : '—'}
+                  {formatLocationDisplay(profile.location) || '—'}
                 </p>
               </div>
               <div>
@@ -304,7 +305,7 @@ export const AdminUserDetail: React.FC = () => {
               <div className="space-y-2">
                 <p className="text-white font-medium">{group.name}</p>
                 <p className="text-slate-400 text-sm">
-                  {group.location.city}, {group.location.state_code}
+                  {formatLocationDisplay(group.location) || `${group.location.city}, ${group.location.state_code}`}
                 </p>
                 <p className="text-slate-400 text-sm">{group.life_stage}</p>
                 <p className="text-slate-400 text-sm">{group.member_ids.length} members</p>

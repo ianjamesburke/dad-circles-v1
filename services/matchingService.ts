@@ -10,7 +10,11 @@ import { UserProfile, MatchingStats } from '../types';
 
 const profilesCol = collection(db, 'profiles');
 
-export const getUnmatchedUsers = async (city?: string, stateCode?: string): Promise<UserProfile[]> => {
+export const getUnmatchedUsers = async (
+  city?: string,
+  stateCode?: string,
+  countryCode?: string
+): Promise<UserProfile[]> => {
   let q = query(profilesCol, where('matching_eligible', '==', true), where('group_id', '==', null));
 
   if (city && stateCode) {
@@ -19,7 +23,8 @@ export const getUnmatchedUsers = async (city?: string, stateCode?: string): Prom
       where('matching_eligible', '==', true),
       where('group_id', '==', null),
       where('location.city', '==', city),
-      where('location.state_code', '==', stateCode)
+      where('location.state_code', '==', stateCode),
+      ...(countryCode ? [where('location.country_code', '==', countryCode)] : [])
     );
   }
 

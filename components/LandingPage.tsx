@@ -21,6 +21,8 @@ const LandingPage: React.FC = () => {
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [isProofCardHovered, setIsProofCardHovered] = useState(false);
 
+  const START_SESSION_TIMEOUT_MS = 12000;
+
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= 768);
@@ -35,9 +37,21 @@ const LandingPage: React.FC = () => {
     e.preventDefault();
     setIsSubmitting(true);
     setErrorMessage('');
+    console.info('startSession: submit');
 
+    let timeoutId: number | undefined;
     try {
-      const result = await database.startSession(email, postcode, signupForOther);
+      const startSessionPromise = database.startSession(email, postcode, signupForOther);
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = window.setTimeout(() => {
+          reject(new Error('startSession_timeout'));
+        }, START_SESSION_TIMEOUT_MS);
+      });
+      const result = await Promise.race([startSessionPromise, timeoutPromise]);
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+      console.info('startSession: response', { status: result?.status });
 
       if (result?.status === 'magic_link_sent') {
         setErrorMessage(
@@ -60,19 +74,22 @@ const LandingPage: React.FC = () => {
         await signInWithCustomToken(auth, result.authToken);
 
         // Fetch and store location data immediately so it's available for the onboarding agent
-        try {
-          const locationInfo = await getLocationFromPostcode(postcode);
-          if (locationInfo && result.sessionId) {
-            await database.updateProfile(result.sessionId, {
-              location: {
-                city: locationInfo.city,
-                state_code: locationInfo.stateCode
-              }
-            });
+        void (async () => {
+          try {
+            const locationInfo = await getLocationFromPostcode(postcode);
+            if (locationInfo && result.sessionId) {
+              await database.updateProfile(result.sessionId, {
+                location: {
+                  city: locationInfo.city,
+                  state_code: locationInfo.stateCode,
+                  country_code: locationInfo.countryCode,
+                }
+              });
+            }
+          } catch (error) {
+            console.error('Error pre-fetching location:', error);
           }
-        } catch (error) {
-          console.error('Error pre-fetching location:', error);
-        }
+        })();
 
         navigate(`/chat`);
         return;
@@ -81,14 +98,22 @@ const LandingPage: React.FC = () => {
       throw new Error('Unexpected response from server');
 
     } catch (error) {
-      console.error('Error submitting lead:', error);
       const err: any = error;
+      if (err?.message === 'startSession_timeout') {
+        console.warn('startSession: timeout');
+        setErrorMessage('Request timed out. Please try again.');
+      } else {
+        console.error('Error submitting lead:', error);
+      }
       if (err?.code === 'functions/resource-exhausted') {
         setErrorMessage(err.message || 'Too many requests. Please try again later.');
-      } else {
+      } else if (err?.message !== 'startSession_timeout') {
         setErrorMessage('Something went wrong. Please try again.');
       }
     } finally {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
       setIsSubmitting(false);
     }
   };

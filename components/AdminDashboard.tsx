@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { database } from '../database';
 import { UserProfile, Message, Role, Lead, Group, MatchingStats } from '../types';
 import { formatChildInfoWithGender } from '../utils/childDisplay';
+import { formatLocationDisplay } from '../utils/location';
 
 export const AdminDashboard: React.FC = () => {
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
@@ -314,7 +315,7 @@ export const AdminDashboard: React.FC = () => {
 
                       <div className="text-xs text-slate-600 flex items-center gap-1.5">
                         <i className="fas fa-map-marker-alt text-[10px] opacity-60"></i>
-                        {p.location ? `${p.location.city}, ${p.location.state_code}` : 'Location pending'}
+                        {formatLocationDisplay(p.location) || 'Location pending'}
                       </div>
                     </div>
 
@@ -613,7 +614,7 @@ export const AdminDashboard: React.FC = () => {
                             <div className="font-medium text-slate-800">{group.name}</div>
                             <div className="text-sm text-slate-600 flex items-center gap-2">
                               <i className="fas fa-map-marker-alt text-xs"></i>
-                              {group.location.city}, {group.location.state_code}
+                              {formatLocationDisplay(group.location) || `${group.location.city}, ${group.location.state_code}`}
                               <span>&bull;</span>
                               <span className="px-1.5 py-0.5 bg-slate-100 rounded text-xs">{group.life_stage}</span>
                               <span>&bull;</span>
@@ -690,7 +691,7 @@ export const AdminDashboard: React.FC = () => {
                             <div className="font-medium text-slate-800">{group.name}</div>
                             <div className="text-sm text-slate-600 flex items-center gap-2">
                               <i className="fas fa-map-marker-alt text-xs"></i>
-                              {group.location.city}, {group.location.state_code}
+                              {formatLocationDisplay(group.location) || `${group.location.city}, ${group.location.state_code}`}
                               <span>&bull;</span>
                               <span>{group.life_stage}</span>
                             </div>
