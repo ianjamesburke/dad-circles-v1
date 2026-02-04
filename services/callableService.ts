@@ -8,8 +8,10 @@ export const startSession = async (
   signupForOther: boolean
 ): Promise<any> => {
     try {
+      console.info('startSession callable: invoking');
       const startSessionFn = httpsCallable(functions, 'startSession');
       const result = await startSessionFn({ email, postcode, signupForOther });
+      console.info('startSession callable: success', { status: result?.data?.status });
       return result.data;
     } catch (error) {
       console.error('❌ Error starting session:', error);

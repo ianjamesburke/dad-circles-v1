@@ -32,6 +32,7 @@ export interface UserLocation {
 export interface UserProfile {
   session_id: string;
   name?: string; // User's first name
+  dad_status?: 'current' | 'expecting' | 'both'; // Current/expecting dad status (inferred or stated)
   email?: string;
   postcode?: string; // Initial postcode from landing page
   onboarded: boolean;

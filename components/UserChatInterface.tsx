@@ -41,6 +41,23 @@ export const UserChatInterface: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (!authReady || authPending) return;
+    if (!sessionId && !tokenParam) {
+      navigate('/', { replace: true });
+    }
+  }, [authReady, authPending, sessionId, tokenParam, navigate]);
+
+  useEffect(() => {
+    if (sessionId || tokenParam) return;
+    const timer = setTimeout(() => {
+      if (!authPending && !sessionId) {
+        navigate('/', { replace: true });
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [authPending, sessionId, tokenParam, navigate]);
+
+  useEffect(() => {
     if (!tokenParam) return;
 
     const redeem = async () => {
@@ -150,7 +167,7 @@ export const UserChatInterface: React.FC = () => {
       await db.addMessage({
         session_id: sid,
         role: Role.AGENT,
-        content: "Hey there! So glad you're here. First things first, what's your name?"
+        content: "Hey, thanks for joining Dad Circles. Excited that you're here. First of all, what's your name? And then are you a current or an expecting dad?"
       });
 
       // Update profile to NAME step since we asked the question

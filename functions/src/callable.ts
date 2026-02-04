@@ -154,6 +154,10 @@ export const startSession = onCall(
     const signupForOther = Boolean(request.data?.signupForOther);
 
     if (!email || !postcode) {
+      logger.warn('startSession missing required fields', {
+        hasEmail: Boolean(email),
+        hasPostcode: Boolean(postcode)
+      });
       throw new HttpsError('invalid-argument', 'Email and postcode are required');
     }
 
@@ -162,85 +166,105 @@ export const startSession = onCall(
 
     const db = admin.firestore();
 
-    const leadQuery = db.collection('leads')
-      .where('email', '==', normalizedEmail)
-      .limit(1);
-    const leadSnap = await leadQuery.get();
-    const existingLead = leadSnap.empty ? undefined : leadSnap.docs[0];
+    try {
+      logger.info('startSession called', {
+        email: maskEmail(normalizedEmail),
+        postcode: maskPostcode(normalizedPostcode),
+        signupForOther
+      });
 
-    if (existingLead?.data()?.session_id && !signupForOther) {
-      // Existing session - send magic link (rate limited)
-      const rateLimitCheck = await RateLimiter.checkMagicLinkRequest(normalizedEmail);
-      if (!rateLimitCheck.allowed) {
-        logger.warn('Magic link request blocked by rate limiter', {
-          email: maskEmail(normalizedEmail)
+      const leadQuery = db.collection('leads')
+        .where('email', '==', normalizedEmail)
+        .limit(1);
+      const leadSnap = await leadQuery.get();
+      const existingLead = leadSnap.empty ? undefined : leadSnap.docs[0];
+
+      if (existingLead?.data()?.session_id && !signupForOther) {
+        // Existing session - send magic link (rate limited)
+        const rateLimitCheck = await RateLimiter.checkMagicLinkRequest(normalizedEmail);
+        if (!rateLimitCheck.allowed) {
+          logger.warn('Magic link request blocked by rate limiter', {
+            email: maskEmail(normalizedEmail)
+          });
+          throw new HttpsError('resource-exhausted', rateLimitCheck.reason || 'Too many requests');
+        }
+
+        const sessionId = existingLead.data().session_id as string;
+        const token = await createMagicLinkToken(sessionId, normalizedEmail);
+        const magicLink = generateMagicLink(token);
+
+        const locationInfo = await getLocationFromPostcode(existingLead.data().postcode || normalizedPostcode);
+        const locationString = locationInfo
+          ? formatLocation(locationInfo.city, locationInfo.stateCode, locationInfo.countryCode)
+          : (existingLead.data().postcode || normalizedPostcode);
+
+        await EmailService.sendTemplateEmail({
+          to: normalizedEmail,
+          templateId: EMAIL_TEMPLATES.RESUME_SESSION,
+          variables: { magic_link: magicLink, location: locationString }
         });
-        throw new HttpsError('resource-exhausted', rateLimitCheck.reason || 'Too many requests');
+
+        return { status: 'magic_link_sent' };
       }
 
-      const sessionId = existingLead.data().session_id as string;
-      const token = await createMagicLinkToken(sessionId, normalizedEmail);
-      const magicLink = generateMagicLink(token);
+      // New session flow (or signup for other)
+      if (signupForOther) {
+        await db.collection('leads').add({
+          email: normalizedEmail,
+          postcode: normalizedPostcode,
+          signupForOther: true,
+          source: 'landing_page',
+          timestamp: FieldValue.serverTimestamp(),
+        });
+        return { status: 'signup_other_recorded' };
+      }
 
-      const locationInfo = await getLocationFromPostcode(existingLead.data().postcode || normalizedPostcode);
-      const locationString = locationInfo
-        ? formatLocation(locationInfo.city, locationInfo.stateCode, locationInfo.countryCode)
-        : (existingLead.data().postcode || normalizedPostcode);
+      const sessionId = crypto.randomUUID();
 
-      await EmailService.sendTemplateEmail({
-        to: normalizedEmail,
-        templateId: EMAIL_TEMPLATES.RESUME_SESSION,
-        variables: { magic_link: magicLink, location: locationString }
-      });
-
-      return { status: 'magic_link_sent' };
-    }
-
-    // New session flow (or signup for other)
-    if (signupForOther) {
-      await db.collection('leads').add({
+      const leadData = {
         email: normalizedEmail,
         postcode: normalizedPostcode,
-        signupForOther: true,
+        signupForOther: false,
+        session_id: sessionId,
         source: 'landing_page',
         timestamp: FieldValue.serverTimestamp(),
+      };
+
+      if (existingLead) {
+        await existingLead.ref.set(leadData, { merge: true });
+      } else {
+        await db.collection('leads').add(leadData);
+      }
+
+      // Create profile
+      await db.collection('profiles').doc(sessionId).set({
+        session_id: sessionId,
+        email: normalizedEmail,
+        postcode: normalizedPostcode,
+        onboarded: false,
+        onboarding_step: 'welcome',
+        children: [],
+        last_updated: FieldValue.serverTimestamp(),
+        matching_eligible: false,
       });
-      return { status: 'signup_other_recorded' };
+
+      // Create a Firebase custom auth token tied to the session ID
+      const authToken = await admin.auth().createCustomToken(sessionId);
+
+      return { status: 'session_created', sessionId, authToken };
+    } catch (error: any) {
+      logger.error('startSession failed', {
+        email: maskEmail(normalizedEmail),
+        postcode: maskPostcode(normalizedPostcode),
+        signupForOther,
+        error: error?.message,
+        code: error?.code
+      });
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+      throw new HttpsError('internal', 'Failed to start session');
     }
-
-    const sessionId = crypto.randomUUID();
-
-    const leadData = {
-      email: normalizedEmail,
-      postcode: normalizedPostcode,
-      signupForOther: false,
-      session_id: sessionId,
-      source: 'landing_page',
-      timestamp: FieldValue.serverTimestamp(),
-    };
-
-    if (existingLead) {
-      await existingLead.ref.set(leadData, { merge: true });
-    } else {
-      await db.collection('leads').add(leadData);
-    }
-
-    // Create profile
-    await db.collection('profiles').doc(sessionId).set({
-      session_id: sessionId,
-      email: normalizedEmail,
-      postcode: normalizedPostcode,
-      onboarded: false,
-      onboarding_step: 'welcome',
-      children: [],
-      last_updated: FieldValue.serverTimestamp(),
-      matching_eligible: false,
-    });
-
-    // Create a Firebase custom auth token tied to the session ID
-    const authToken = await admin.auth().createCustomToken(sessionId);
-
-    return { status: 'session_created', sessionId, authToken };
   }
 );
 
