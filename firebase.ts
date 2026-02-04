@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, connectAuthEmulator } from "firebase/auth";
+import { getAuth, connectAuthEmulator, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 
@@ -20,9 +20,13 @@ export const db = getFirestore(app);
 export const functions = getFunctions(app);
 export const auth = getAuth(app);
 
-// Connect to emulators in development mode
+// Connect to emulators in development mode BEFORE setting persistence
 if (import.meta.env.DEV) {
     try {
+        // Connect to Auth emulator FIRST (before persistence)
+        connectAuthEmulator(auth, "http://localhost:9099", { disableWarnings: true });
+        console.log('🔧 Connected to Auth emulator on port 9099');
+
         // Connect to Firestore emulator
         connectFirestoreEmulator(db, 'localhost', 8083);
         console.log('🔧 Connected to Firestore emulator on port 8083');
@@ -31,12 +35,18 @@ if (import.meta.env.DEV) {
         connectFunctionsEmulator(functions, 'localhost', 5003);
         console.log('🔧 Connected to Functions emulator on port 5003');
 
-        // Connect to Auth emulator
-        // Note: We're enabling this to support the "Simple Firebase authentication through the emulator" requirement
-        connectAuthEmulator(auth, "http://localhost:9099");
-        console.log('🔧 Connected to Auth emulator on port 9099');
-
     } catch (error: any) {
         console.log('⚠️ Emulator connection failed or already connected:', error.message);
     }
 }
+
+// Set auth persistence to LOCAL (survives page reloads and browser restarts)
+// This MUST happen after emulator connection
+export const authReady = setPersistence(auth, browserLocalPersistence)
+    .then(() => {
+        console.log('✅ Auth persistence set to LOCAL');
+    })
+    .catch((error) => {
+        console.error('❌ Failed to set auth persistence:', error);
+    });
+
