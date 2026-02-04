@@ -21,6 +21,7 @@ interface UserProfile {
   location?: {
     city: string;
     state_code: string;
+    country_code?: string;
   };
   children: Array<{
     type?: 'expecting' | 'existing'; // Deprecated - inferred from date
@@ -41,6 +42,7 @@ interface Group {
   location: {
     city: string;
     state_code: string;
+    country_code?: string;
   };
   member_ids: string[];
   member_emails: string[];
@@ -204,7 +206,7 @@ function validateAgeGap(users: UserProfile[], lifeStage: LifeStage, config: Matc
  */
 async function formGroupsFromUsers(
   users: UserProfile[],
-  location: { city: string; state_code: string },
+  location: { city: string; state_code: string; country_code?: string },
   lifeStage: LifeStage,
   testMode: boolean,
   config: MatchingConfig
@@ -388,7 +390,8 @@ export async function runMatchingAlgorithm(
     for (const user of unmatchedUsers) {
       if (!user.location) continue;
 
-      const locKey = `${user.location.city}|${user.location.state_code}`;
+      const countryCode = user.location.country_code || 'US';
+      const locKey = `${user.location.city}|${user.location.state_code}|${countryCode}`;
       const lifeStage = getLifeStageFromUser(user);
 
       if (!lifeStage) continue;
@@ -408,8 +411,8 @@ export async function runMatchingAlgorithm(
     const allGroups: Group[] = [];
 
     for (const [locKey, lifeStageBuckets] of Object.entries(buckets)) {
-      const [cityName, stateCodeName] = locKey.split('|');
-      const location = { city: cityName, state_code: stateCodeName };
+      const [cityName, stateCodeName, countryCode] = locKey.split('|');
+      const location = { city: cityName, state_code: stateCodeName, country_code: countryCode || 'US' };
 
       for (const [lifeStageStr, users] of Object.entries(lifeStageBuckets)) {
         const lifeStage = lifeStageStr as LifeStage;

@@ -65,7 +65,8 @@ export const CONFIG = {
     maxHistoryLength: 50,
     minBirthYear: 2010,
     maxBirthYear: 2099,
-    stateCodePattern: /^[A-Z]{2}$/,
+    stateCodePattern: /^[A-Z]{2,3}$/,
+    countryCodePattern: /^[A-Z]{2}$/,
   },
 
   /**

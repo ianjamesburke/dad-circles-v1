@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { database } from '../../database';
 import { Lead, UserProfile } from '../../types';
+import { formatLocationDisplay } from '../../utils/location';
 
 // Extended lead with linked profile info for display
 interface LeadWithProfile extends Lead {
@@ -228,9 +229,9 @@ export const AdminLeads: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-4 py-4">
-                      {lead.profile?.location ? (
+                      {formatLocationDisplay(lead.profile?.location) ? (
                         <span className="text-slate-300 text-sm">
-                          {lead.profile.location.city}, {lead.profile.location.state_code}
+                          {formatLocationDisplay(lead.profile?.location)}
                         </span>
                       ) : (
                         <span className="text-slate-600 text-sm">—</span>

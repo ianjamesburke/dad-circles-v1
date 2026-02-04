@@ -29,7 +29,7 @@ IMPORTANT RULES:
 - Only include fields you have CONFIRMED data for
 - If user says "she's 3" without a month, ASK for the month first - don't guess
 - For children: birth_year required, birth_month optional (1-12). We infer expecting vs existing from the date.
-- For location: need both city and state_code (2-letter like CA, TX, NY)
+- For location: include city, state/region code, and country code (US, AU, etc.)
 - Set onboarded=true ONLY when user explicitly confirms their info is correct`,
     parameters: {
       type: Type.OBJECT,
@@ -62,7 +62,11 @@ IMPORTANT RULES:
         },
         state_code: { 
           type: Type.STRING, 
-          description: 'Two-letter state code (CA, TX, NY, etc.)' 
+          description: 'State/region code (e.g., CA, TX, NSW)' 
+        },
+        country_code: {
+          type: Type.STRING,
+          description: 'Two-letter country code (US, AU, etc.)'
         },
         onboarded: {
           type: Type.BOOLEAN,
@@ -92,7 +96,7 @@ const buildSystemPrompt = (profile: any): string => {
     : '❌ none';
 
   const locationDisplay = profile.location?.city 
-    ? `${profile.location.city}, ${profile.location.state_code}` 
+    ? `${profile.location.city}, ${profile.location.state_code}${profile.location.country_code && profile.location.country_code !== 'US' ? `, ${profile.location.country_code}` : ''}` 
     : '❌ none';
 
   // Determine current step based on what's collected
@@ -108,8 +112,8 @@ const buildSystemPrompt = (profile: any): string => {
   } else if (profile.name && profile.children?.length && profile.interests?.length) {
     currentStep = 'LOCATION';
     nextAction = profile.location?.city 
-      ? `Confirm location is correct: "${profile.location.city}, ${profile.location.state_code}"`
-      : 'Ask what city and state they are in';
+      ? `Confirm location is correct: "${profile.location.city}, ${profile.location.state_code}${profile.location.country_code && profile.location.country_code !== 'US' ? `, ${profile.location.country_code}` : ''}"`
+      : 'Ask what city and state/region they are in (include country if outside US)';
   } else if (profile.name && profile.children?.length) {
     currentStep = 'INTERESTS';
     nextAction = 'Ask about hobbies/interests (hiking, gaming, sports, cooking, etc.)';
@@ -149,7 +153,7 @@ STRICT FLOW - FOLLOW THIS ORDER:
 2. CHILDREN → Ask if expecting or have kids. Get birth/due year. Ask for month if they give age like "she's 3".
    IMPORTANT: After first child, ALWAYS ask "Do you have any other kids?" before moving on.
 3. INTERESTS → Ask about hobbies (hiking, gaming, sports, cooking, music, etc.)
-4. LOCATION → If we have location from signup, confirm it's correct. Otherwise ask for city + state.
+4. LOCATION → If we have location from signup, confirm it's correct. Otherwise ask for city + state/region (country if outside US).
 5. CONFIRM → Show summary, ask if it looks good
 6. COMPLETE → Only after explicit "yes" / "looks good" / "correct"
 
@@ -174,6 +178,7 @@ interface ProfileUpdate {
   interests?: string[];
   city?: string;
   state_code?: string;
+  country_code?: string;
   onboarded?: boolean;
 }
 
@@ -229,15 +234,23 @@ const validateAndApply = (
     }
   }
 
-  // Location - need both city and state_code
-  if (args.city !== undefined || args.state_code !== undefined) {
+  // Location - need city, state_code, country_code
+  if (args.city !== undefined || args.state_code !== undefined || args.country_code !== undefined) {
     const city = args.city?.trim();
     const state = args.state_code?.trim().toUpperCase();
+    const explicitCountry = args.country_code?.trim().toUpperCase()
+      || currentProfile.location?.country_code;
+    const country = explicitCountry || (state && state.length === 3 ? 'AU' : 'US');
     
-    if (city && state && /^[A-Z]{2}$/.test(state)) {
-      updates.location = { city, state_code: state };
-    } else if (city || state) {
-      errors.push('Location needs both city and 2-letter state code');
+    if (
+      city &&
+      state &&
+      CONFIG.validation.stateCodePattern.test(state) &&
+      CONFIG.validation.countryCodePattern.test(country)
+    ) {
+      updates.location = { city, state_code: state, country_code: country };
+    } else if (city || state || args.country_code) {
+      errors.push('Location needs city, state/region code, and country code');
     }
   }
 
@@ -246,7 +259,7 @@ const validateAndApply = (
     const merged = { ...currentProfile, ...updates };
     const hasName = !!merged.name;
     const hasChildren = merged.children && merged.children.length > 0;
-    const hasLocation = merged.location?.city && merged.location?.state_code;
+    const hasLocation = merged.location?.city && merged.location?.state_code && (merged.location?.country_code || 'US');
     
     if (hasName && hasChildren && hasLocation) {
       updates.onboarded = true;
@@ -282,7 +295,7 @@ const generateFallback = (profile: any, updates: any): string => {
     return "What are some of your hobbies or interests? Things like hiking, gaming, cooking, sports - whatever you're into!";
   }
   if (!merged.location) {
-    return "What city and state are you in?";
+    return "What city and state/region are you in? If you’re outside the US, include the country.";
   }
   
   // Have everything - show summary
@@ -294,7 +307,10 @@ const generateFallback = (profile: any, updates: any): string => {
     return `${isExp ? 'Expecting ' : ''}${date}${c.gender ? ` (${c.gender})` : ''}`;
   }).join(', ');
   
-  return `Here's what I have:\n\nName: ${merged.name}\nKids: ${kids}\nInterests: ${merged.interests?.join(', ') || 'None'}\nLocation: ${merged.location.city}, ${merged.location.state_code}\n\nLook good?`;
+  const countrySuffix = merged.location.country_code && merged.location.country_code !== 'US'
+    ? `, ${merged.location.country_code}`
+    : '';
+  return `Here's what I have:\n\nName: ${merged.name}\nKids: ${kids}\nInterests: ${merged.interests?.join(', ') || 'None'}\nLocation: ${merged.location.city}, ${merged.location.state_code}${countrySuffix}\n\nLook good?`;
 };
 
 // ============================================================================

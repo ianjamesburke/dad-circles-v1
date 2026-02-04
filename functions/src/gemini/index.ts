@@ -17,8 +17,8 @@ import type { Content } from '@google/genai';
 import { GEMINI_CONFIG } from './config';
 import { toolDeclarations } from './tools';
 import { buildSystemPrompt } from './prompts';
-import { validateAndApplyUpdates } from './validation';
-import { generateFallback } from './fallbacks';
+import { validateAndApplyExtraction, DialogSignals } from './validation';
+import { buildDialogResponse } from './dialog';
 
 // Define secret for Gemini API key
 const geminiApiKey = defineSecret("GEMINI_API_KEY");
@@ -123,8 +123,9 @@ export const getGeminiResponse = onCall(
 
       const ai = new GoogleGenAI({ apiKey });
 
-      // Convert history to Gemini format
-      const contents: Content[] = history.map((msg: any) => ({
+      // Use only the most recent turns for extraction context
+      const recentHistory = history.slice(-4);
+      const contents: Content[] = recentHistory.map((msg: any) => ({
         role: msg.role === 'user' ? 'user' : 'model',
         parts: [{ text: msg.content }]
       }));
@@ -140,12 +141,12 @@ export const getGeminiResponse = onCall(
           systemInstruction: systemPrompt,
           tools: [{ functionDeclarations: toolDeclarations }],
           toolConfig: {
-            functionCallingConfig: { mode: FunctionCallingConfigMode.AUTO }
+            functionCallingConfig: { mode: FunctionCallingConfigMode.ANY }
           },
           thinkingConfig: {
             thinkingLevel: ThinkingLevel[GEMINI_CONFIG.thinkingLevel]
           },
-          temperature: GEMINI_CONFIG.temperature,
+          temperature: 0,
           maxOutputTokens: GEMINI_CONFIG.maxOutputTokens
         }
       });
@@ -161,44 +162,33 @@ export const getGeminiResponse = onCall(
       
       // Process function calls and validate updates
       let allUpdates: any = {};
+      let signals: DialogSignals = {};
       const validationErrors: string[] = [];
-      
+
       if (response.functionCalls?.length) {
         for (const call of response.functionCalls) {
-          if (call.name === 'update_profile' && call.args) {
-            const { updates, errors } = validateAndApplyUpdates(
+          if (call.name === 'extract_profile' && call.args) {
+            const { updates, signals: newSignals, errors } = validateAndApplyExtraction(
               call.args,
               { ...profile, ...allUpdates }
             );
             allUpdates = { ...allUpdates, ...updates };
+            signals = { ...signals, ...newSignals };
             if (errors.length) validationErrors.push(...errors);
           }
         }
       }
 
-      // Get text response
-      let textResponse = response.text || '';
-      if (!textResponse && response.candidates?.[0]?.content?.parts) {
-        for (const part of response.candidates[0].content.parts) {
-          if ('text' in part && part.text) {
-            textResponse += part.text;
-          }
-        }
+      if (validationErrors.some(err => err.includes('birth'))) {
+        signals.needsChildBirthdate = true;
       }
 
-      // Fallback text if none provided
-      if (!textResponse) {
-        textResponse = generateFallback(profile, allUpdates);
-      }
-
-      // If model tried to complete but validation failed, override with a helpful prompt
-      if (validationErrors.includes('Cannot complete: missing required fields')) {
-        textResponse = generateFallback(profile, allUpdates);
-      }
+      const dialog = buildDialogResponse(profile, allUpdates, signals);
 
       return {
-        message: textResponse,
-        profile_updates: allUpdates
+        message: dialog.message,
+        profile_updates: allUpdates,
+        next_step: dialog.nextStep
       };
 
     } catch (error: any) {

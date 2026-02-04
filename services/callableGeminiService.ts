@@ -54,9 +54,11 @@ export const getAgentResponse = async (profile: UserProfile, history: Message[])
     const data = result.data as {
       message: string;
       profile_updates: Partial<UserProfile>;
+      next_step?: OnboardingStep;
     };
 
-    const isComplete = data.profile_updates.onboarded === true;
+    const nextStep = data.next_step ?? profile.onboarding_step;
+    const isComplete = nextStep === OnboardingStep.COMPLETE;
     
     if (isDev) {
       console.log(`✅ [Gemini] Done in ${Date.now() - startTime}ms`, { 
@@ -66,8 +68,8 @@ export const getAgentResponse = async (profile: UserProfile, history: Message[])
 
     return {
       message: data.message,
-      next_step: isComplete ? OnboardingStep.COMPLETE : profile.onboarding_step,
-      profile_updates: data.profile_updates
+      next_step: nextStep,
+      profile_updates: data.profile_updates ?? {}
     };
 
   } catch (error: any) {

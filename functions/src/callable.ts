@@ -120,7 +120,7 @@ export const sendMagicLink = onCall(
     });
   }
   const locationString = locationInfo
-    ? formatLocation(locationInfo.city, locationInfo.stateCode)
+    ? formatLocation(locationInfo.city, locationInfo.stateCode, locationInfo.countryCode)
     : profile.postcode;
 
   // Send resume-session email using template
@@ -184,7 +184,7 @@ export const startSession = onCall(
 
       const locationInfo = await getLocationFromPostcode(existingLead.data().postcode || normalizedPostcode);
       const locationString = locationInfo
-        ? formatLocation(locationInfo.city, locationInfo.stateCode)
+        ? formatLocation(locationInfo.city, locationInfo.stateCode, locationInfo.countryCode)
         : (existingLead.data().postcode || normalizedPostcode);
 
       await EmailService.sendTemplateEmail({
@@ -318,7 +318,7 @@ export const sendCompletionEmail = onCall(
     });
   }
   const locationString = locationInfo
-    ? formatLocation(locationInfo.city, locationInfo.stateCode)
+    ? formatLocation(locationInfo.city, locationInfo.stateCode, locationInfo.countryCode)
     : profile.postcode;
 
   // Send welcome-completed email
@@ -489,7 +489,7 @@ export const sendManualAbandonmentEmail = onCall(
           });
         }
         const locationString = locationInfo
-            ? formatLocation(locationInfo.city, locationInfo.stateCode)
+            ? formatLocation(locationInfo.city, locationInfo.stateCode, locationInfo.countryCode)
             : profile.postcode;
 
         // Send welcome-abandoned email

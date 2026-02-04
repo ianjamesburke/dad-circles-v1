@@ -1,8 +1,8 @@
 /**
  * Gemini Tool Declarations
- * 
+ *
  * Function declarations for Gemini's function calling feature.
- * Defines the update_profile tool used during onboarding.
+ * We keep this tool narrow and deterministic: extraction only.
  */
 
 import { Type } from '@google/genai';
@@ -13,60 +13,102 @@ import type { FunctionDeclaration } from '@google/genai';
  */
 export const toolDeclarations: FunctionDeclaration[] = [
   {
-    name: 'update_profile',
-    description: `Update user profile fields. Call this whenever you learn new info about the user.
-    
+    name: 'extract_profile',
+    description: `Extract only the user-provided facts from the latest turn.
+
 IMPORTANT RULES:
-- Only include fields you have CONFIRMED data for
-- If user says "she's 3" without a month, ASK for the month first - don't guess
-- For children: birth_year required, birth_month optional (1-12). We infer expecting vs existing from the date.
-- For location: need both city and state_code (2-letter like CA, TX, NY)
-- Set onboarded=true ONLY when user explicitly confirms their info is correct`,
+- Do NOT guess or infer missing data
+- If the user gives age only (e.g., "she's 3"), use children_age_years instead of birth_year
+- Only include fields that are explicitly stated or clearly confirmed
+- For location, include city + state/region code and country code (US, AU, etc.)
+- For "no other kids"/"only one"/"that's it", set no_more_children=true
+- For "yes, more kids" without details, set has_more_children=true`,
     parameters: {
       type: Type.OBJECT,
       properties: {
-        name: { 
-          type: Type.STRING, 
-          description: 'User\'s first name' 
+        name: {
+          type: Type.STRING,
+          description: 'User\'s first name'
         },
-        children: {
+        children_add: {
           type: Type.ARRAY,
-          description: 'Array of children. Each needs: birth_year (number). Optional: birth_month (1-12), gender ("Boy"|"Girl"). Future dates = expecting, past dates = existing.',
+          description: 'Children to add. birth_year required. Optional birth_month (1-12), gender ("Boy"|"Girl").',
           items: {
             type: Type.OBJECT,
             properties: {
-              birth_year: { 
-                type: Type.NUMBER, 
-                description: 'Birth year or due year (e.g., 2023, 2025)' 
+              birth_year: {
+                type: Type.NUMBER,
+                description: 'Birth year or due year (e.g., 2023, 2026)'
               },
-              birth_month: { 
-                type: Type.NUMBER, 
-                description: 'Month 1-12. Only include if user explicitly said it.' 
+              birth_month: {
+                type: Type.NUMBER,
+                description: 'Month 1-12. Only include if user explicitly said it.'
               },
-              gender: { 
-                type: Type.STRING, 
-                enum: ['Boy', 'Girl'] 
+              gender: {
+                type: Type.STRING,
+                enum: ['Boy', 'Girl']
               }
             },
             required: ['birth_year']
           }
+        },
+        children_replace: {
+          type: Type.ARRAY,
+          description: 'Replace the full children list ONLY if the user explicitly corrects existing child info.',
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              birth_year: {
+                type: Type.NUMBER,
+                description: 'Birth year or due year (e.g., 2023, 2026)'
+              },
+              birth_month: {
+                type: Type.NUMBER,
+                description: 'Month 1-12. Only include if user explicitly said it.'
+              },
+              gender: {
+                type: Type.STRING,
+                enum: ['Boy', 'Girl']
+              }
+            },
+            required: ['birth_year']
+          }
+        },
+        children_age_years: {
+          type: Type.ARRAY,
+          description: 'If user only provides ages (e.g., "3 years old"), list the ages here instead of birth_year.',
+          items: { type: Type.NUMBER }
         },
         interests: {
           type: Type.ARRAY,
           description: 'List of hobbies/interests',
           items: { type: Type.STRING }
         },
-        city: { 
-          type: Type.STRING, 
-          description: 'City name' 
-        },
-        state_code: { 
-          type: Type.STRING, 
-          description: 'Two-letter state code (CA, TX, NY, etc.)' 
-        },
-        onboarded: {
+        interests_clear: {
           type: Type.BOOLEAN,
-          description: 'Set to true ONLY when user explicitly confirms all info is correct'
+          description: 'Set to true if user explicitly says they have no interests/hobbies'
+        },
+        location: {
+          type: Type.OBJECT,
+          description: 'Location with city, state/region code, and country code',
+          properties: {
+            city: { type: Type.STRING },
+            state_code: { type: Type.STRING },
+            country_code: { type: Type.STRING }
+          },
+          required: ['city', 'state_code']
+        },
+        confirm_profile: {
+          type: Type.BOOLEAN,
+          description: 'Set true only if user explicitly confirms the summary is correct'
+        },
+        no_more_children: {
+          type: Type.BOOLEAN,
+          description: 'True if user says they have no other kids'
+        },
+        has_more_children: {
+          type: Type.BOOLEAN,
+          description: 'True if user says they have more kids but gives no details'
         }
       }
     }

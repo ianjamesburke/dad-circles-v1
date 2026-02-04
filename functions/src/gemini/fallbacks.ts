@@ -9,7 +9,7 @@ interface UserProfile {
   name?: string;
   children?: Array<{ birth_year: number; birth_month?: number; gender?: string }>;
   interests?: string[];
-  location?: { city: string; state_code: string };
+  location?: { city: string; state_code: string; country_code?: string };
   onboarded?: boolean;
 }
 
@@ -42,7 +42,7 @@ export const generateFallback = (profile: UserProfile, updates: any): string => 
   
   // Missing location
   if (!merged.location) {
-    return "What city and state are you in?";
+    return "What city and state/region are you in? If you’re outside the US, include the country.";
   }
   
   // Have everything - show confirmation summary
@@ -55,5 +55,8 @@ export const generateFallback = (profile: UserProfile, updates: any): string => 
   }).join(', ');
   
   const nameLine = merged.name ? `Name: ${merged.name}\n` : '';
-  return `Here's what I have:\n\n${nameLine}Kids: ${kids}\nInterests: ${merged.interests?.join(', ') || 'None'}\nLocation: ${merged.location.city}, ${merged.location.state_code}\n\nLook good?`;
+  const countrySuffix = merged.location.country_code && merged.location.country_code !== 'US'
+    ? `, ${merged.location.country_code}`
+    : '';
+  return `Here's what I have:\n\n${nameLine}Kids: ${kids}\nInterests: ${merged.interests?.join(', ') || 'None'}\nLocation: ${merged.location.city}, ${merged.location.state_code}${countrySuffix}\n\nLook good?`;
 };

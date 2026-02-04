@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { database } from '../../database';
 import { UserProfile, Group, Lead, MatchingStats } from '../../types';
+import { formatLocationDisplay } from '../../utils/location';
 
 interface StatCardProps {
   title: string;
@@ -191,7 +192,7 @@ export const AdminOverview: React.FC = () => {
                     {profile.email || `Session ${profile.session_id.slice(0, 8)}...`}
                   </p>
                   <p className="text-slate-500 text-xs">
-                    {profile.location ? `${profile.location.city}, ${profile.location.state_code}` : 'No location'}
+                    {formatLocationDisplay(profile.location) || 'No location'}
                   </p>
                 </div>
                 <span className={`px-2 py-1 rounded text-xs font-medium ${profile.onboarded
@@ -229,7 +230,7 @@ export const AdminOverview: React.FC = () => {
                 <div className="flex-1 min-w-0">
                   <p className="text-white text-sm font-medium truncate">{group.name}</p>
                   <p className="text-slate-500 text-xs">
-                    {group.location.city}, {group.location.state_code} • {group.life_stage}
+                    {(formatLocationDisplay(group.location) || `${group.location.city}, ${group.location.state_code}`)} • {group.life_stage}
                   </p>
                 </div>
                 <span className="text-slate-500 text-sm">

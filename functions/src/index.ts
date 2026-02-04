@@ -111,7 +111,7 @@ export const sendWelcomeEmail = onDocumentCreated(
           });
         }
         const locationString = locationInfo
-          ? formatLocation(locationInfo.city, locationInfo.stateCode)
+          ? formatLocation(locationInfo.city, locationInfo.stateCode, locationInfo.countryCode)
           : postcode;
 
         const emailTemplate = {
@@ -208,7 +208,7 @@ export const sendFollowUpEmails = onSchedule(
             });
           }
           const locationString = locationInfo
-            ? formatLocation(locationInfo.city, locationInfo.stateCode)
+            ? formatLocation(locationInfo.city, locationInfo.stateCode, locationInfo.countryCode)
             : postcode;
 
           const emailTemplate = {
@@ -393,7 +393,7 @@ export const sendAbandonedOnboardingEmails = onSchedule(
             });
           }
           const locationString = locationInfo
-            ? formatLocation(locationInfo.city, locationInfo.stateCode)
+            ? formatLocation(locationInfo.city, locationInfo.stateCode, locationInfo.countryCode)
             : profile.postcode;
 
           // Send welcome-abandoned email

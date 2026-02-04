@@ -22,13 +22,7 @@
     "logs": "node scripts/readLogs.js",
     "logs:matching": "node scripts/readLogs.js matching",
     "logs:database": "node scripts/readLogs.js database",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "test:ui": "vitest --ui",
-    "e2e": "playwright test",
-    "e2e:local": "cross-env E2E_BASE_URL=http://localhost:5173 playwright test"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@google/genai": "^1.38.0",
@@ -44,23 +38,15 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.1",
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
-    "@types/jest": "^30.0.0",
     "@types/node": "^22.19.7",
     "@types/react": "^18.3.27",
     "@types/react-dom": "^18.3.7",
     "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "^5.1.2",
-    "@vitest/coverage-v8": "^4.0.18",
-    "@vitest/ui": "^4.0.18",
     "cross-env": "^10.1.0",
-    "jsdom": "^27.4.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
     "typescript": "~5.8.3",
-    "vite": "^6.4.1",
-    "vitest": "^4.0.18"
+    "vite": "^6.4.1"
   }
 }

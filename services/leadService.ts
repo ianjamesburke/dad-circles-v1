@@ -52,7 +52,7 @@ export const updateLead = async (leadId: string, updates: Partial<Lead>): Promis
     return snap.data() as Lead;
 };
 
-export const deleteLeadsForUser = async (email?: string, sessionId?: string): Promise<void> => {
+export async function deleteLeadsForUser(email?: string, sessionId?: string): Promise<void> {
     const deleteDocs = async (q: ReturnType<typeof query>) => {
       const snap = await getDocs(q);
       if (snap.empty) return;
@@ -82,4 +82,4 @@ export const deleteLeadsForUser = async (email?: string, sessionId?: string): Pr
     if (tasks.length > 0) {
       await Promise.all(tasks);
     }
-};
+}

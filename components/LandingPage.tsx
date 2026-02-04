@@ -66,7 +66,8 @@ const LandingPage: React.FC = () => {
             await database.updateProfile(result.sessionId, {
               location: {
                 city: locationInfo.city,
-                state_code: locationInfo.stateCode
+                state_code: locationInfo.stateCode,
+                country_code: locationInfo.countryCode,
               }
             });
           }

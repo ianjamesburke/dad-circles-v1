@@ -40,11 +40,16 @@ export const getAllGroups = async (): Promise<Group[]> => {
     return snap.docs.map(d => d.data() as Group);
 };
 
-export const getGroupsByLocation = async (city: string, stateCode: string): Promise<Group[]> => {
+export const getGroupsByLocation = async (
+  city: string,
+  stateCode: string,
+  countryCode?: string
+): Promise<Group[]> => {
     const q = query(
       groupsCol,
       where('location.city', '==', city),
       where('location.state_code', '==', stateCode),
+      ...(countryCode ? [where('location.country_code', '==', countryCode)] : []),
       orderBy('created_at', 'desc')
     );
     const snap = await getDocs(q);

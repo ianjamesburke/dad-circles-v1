@@ -26,6 +26,7 @@ export interface Child {
 export interface UserLocation {
   city: string;
   state_code: string;
+  country_code: string;
 }
 
 export interface UserProfile {
@@ -38,6 +39,7 @@ export interface UserProfile {
   location?: UserLocation;
   interests?: string[];
   children: Child[];
+  children_complete?: boolean; // True when user confirms they have no other kids
   siblings?: Child[]; // Other existing children
   last_updated: any; // Firestore Timestamp (server-side) or number (legacy)
 
