@@ -16,8 +16,20 @@ export const AdminLogin: React.FC = () => {
         setError('');
         try {
             const credential = await signInWithEmailAndPassword(auth, email, password);
-            // Ensure custom claims (admin=true) are present immediately after login.
+            
+            // Force refresh to get custom claims (admin=true)
             await credential.user.getIdToken(true);
+            
+            // Verify admin claim is present
+            const tokenResult = await credential.user.getIdTokenResult();
+            if (!tokenResult.claims.admin) {
+                setError('Account does not have admin privileges');
+                await auth.signOut();
+                setLoading(false);
+                return;
+            }
+            
+            console.log('✅ Admin login successful with claims');
             navigate('/admin');
         } catch (error: any) {
             setError('Invalid email or password');

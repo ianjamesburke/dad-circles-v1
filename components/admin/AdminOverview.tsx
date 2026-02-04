@@ -54,9 +54,11 @@ export const AdminOverview: React.FC = () => {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [stats, setStats] = useState<MatchingStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const [profilesData, groupsData, leadsData, statsData] = await Promise.all([
         database.getAllProfiles(),
@@ -68,8 +70,12 @@ export const AdminOverview: React.FC = () => {
       setGroups(groupsData);
       setLeads(leadsData);
       setStats(statsData);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading data:', error);
+      const errorMsg = error?.code === 'functions/permission-denied' 
+        ? 'Permission denied - your session may have expired. Try logging out and back in.'
+        : error?.message || 'Failed to load data';
+      setError(errorMsg);
     }
     setLoading(false);
   };
@@ -89,6 +95,30 @@ export const AdminOverview: React.FC = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
+              <i className="fas fa-exclamation-circle text-red-400"></i>
+            </div>
+            <div>
+              <h3 className="text-red-400 font-medium">Failed to Load Data</h3>
+              <p className="text-red-400/70 text-sm">{error}</p>
+            </div>
+          </div>
+          <button
+            onClick={loadData}
+            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium transition"
+          >
+            Try Again
+          </button>
+        </div>
       </div>
     );
   }

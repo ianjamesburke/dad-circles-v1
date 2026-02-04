@@ -12,7 +12,7 @@ export const CONFIG = {
   gemini: {
     model: 'gemini-2.5-flash',
     timeout: 30,
-    maxOutputTokens: 512,
+    maxOutputTokens: 1024,
     temperature: 0.4,
     thinkingLevel: 'MINIMAL' as const,
   },

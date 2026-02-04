@@ -1,6 +1,18 @@
 
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../firebase';
+import { httpsCallable, HttpsCallableResult } from 'firebase/functions';
+import { functions, auth } from '../firebase';
+
+// Helper to handle auth errors consistently
+const handleCallableError = (error: any, functionName: string) => {
+    console.error(`❌ Error in ${functionName}:`, error);
+    
+    // Check for permission-denied errors (expired token)
+    if (error.code === 'functions/permission-denied') {
+        console.warn('⚠️ Permission denied - token may be expired. Try logging out and back in.');
+    }
+    
+    throw error;
+};
 
 export const startSession = async (
   email: string,
@@ -14,8 +26,7 @@ export const startSession = async (
       console.info('startSession callable: success', { status: (result?.data as any)?.status });
       return result.data;
     } catch (error) {
-      console.error('❌ Error starting session:', error);
-      throw error;
+      handleCallableError(error, 'startSession');
     }
 };
 
@@ -25,8 +36,7 @@ export const redeemMagicLink = async (token: string): Promise<any> => {
       const result = await redeemFn({ token });
       return result.data;
     } catch (error) {
-      console.error('❌ Error redeeming magic link:', error);
-      throw error;
+      handleCallableError(error, 'redeemMagicLink');
     }
 };
 
@@ -37,8 +47,7 @@ export const runMatchingAlgorithm = async (): Promise<any> => {
       const result = await runMatchingFn({});
       return result.data;
     } catch (error) {
-      console.error('❌ Error running matching algorithm:', error);
-      throw error;
+      handleCallableError(error, 'runMatchingAlgorithm');
     }
 };
 
@@ -48,8 +57,7 @@ export const approveGroup = async (groupId: string): Promise<any> => {
       const result = await approveGroupFn({ groupId });
       return result.data;
     } catch (error) {
-      console.error('❌ Error approving group:', error);
-      throw error;
+      handleCallableError(error, 'approveGroup');
     }
 };
 
@@ -59,8 +67,7 @@ export const deleteGroupFunc = async (groupId: string): Promise<any> => {
       const result = await deleteGroupFn({ groupId });
       return result.data;
     } catch (error) {
-      console.error('❌ Error deleting group:', error);
-      throw error;
+      handleCallableError(error, 'deleteGroup');
     }
 };
 
