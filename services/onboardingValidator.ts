@@ -26,14 +26,30 @@ export const validateProfileCompleteness = (profile: UserProfile): ValidationRes
       if (child.birth_month !== undefined && (child.birth_month < 1 || child.birth_month > 12)) {
         errors.push(`Child ${index + 1}: Invalid birth month`);
       }
-      if (!child.birth_year || child.birth_year < 2015 || child.birth_year > 2035) {
+      if (!child.birth_year || child.birth_year < 2010 || child.birth_year > 2099) {
         errors.push(`Child ${index + 1}: Invalid birth year`);
       }
     });
   }
 
-  if (!profile.location || !profile.location.city || !profile.location.state_code) {
-    errors.push('Location (city and state) is required');
+  if (
+    !profile.location ||
+    !profile.location.city ||
+    !profile.location.state_code ||
+    profile.location_confirmed !== true
+  ) {
+    errors.push('Location (city and state/region) is required');
+  }
+  if (profile.location?.country_code && !/^[A-Z]{2}$/.test(profile.location.country_code.toUpperCase())) {
+    errors.push('Location country code must be a 2-letter code');
+  }
+
+  if (profile.interests === undefined) {
+    errors.push('Interests are required (can be empty)');
+  }
+
+  if (profile.children_complete !== true) {
+    errors.push('Children list not confirmed complete');
   }
 
   return {

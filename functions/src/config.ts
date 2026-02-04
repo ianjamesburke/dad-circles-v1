@@ -10,7 +10,7 @@ export const CONFIG = {
    * Gemini API configuration
    */
   gemini: {
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-2.5-flash',
     timeout: 30,
     maxOutputTokens: 512,
     temperature: 0.4,

@@ -36,6 +36,7 @@ export interface UserProfile {
   onboarded: boolean;
   onboarding_step: OnboardingStep;
   location?: UserLocation;
+  location_confirmed?: boolean;
   interests?: string[];
   children: Child[];
   siblings?: Child[]; // Other existing children
