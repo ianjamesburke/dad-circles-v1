@@ -37,6 +37,10 @@ const CookiePolicy: React.FC = () => {
         const m = marketingEnabled ? '1' : '0';
         localStorage.setItem('cookie-consent', `${a},${m},${Date.now()}`);
         setSaveStatus('Preferences saved successfully!');
+
+        // Trigger tracking scripts to update
+        window.dispatchEvent(new Event('cookie-consent-updated'));
+
         setTimeout(() => setSaveStatus(null), 3000);
     };
 

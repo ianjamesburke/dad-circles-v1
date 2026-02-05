@@ -223,6 +223,8 @@ const LandingPage: React.FC = () => {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter your email"
                     required
+                    autoCapitalize="none"
+                    autoComplete="email"
                     style={styles.input}
                   />
                   <input
@@ -231,6 +233,9 @@ const LandingPage: React.FC = () => {
                     onChange={(e) => setPostcode(e.target.value)}
                     placeholder="Postcode"
                     required
+                    autoCapitalize="characters"
+                    autoComplete="postal-code"
+                    autoCorrect="off"
                     style={styles.inputSmall}
                   />
                 </div>
@@ -355,11 +360,11 @@ const LandingPage: React.FC = () => {
           </div>
           <div style={styles.citationBox}>
             <h5 style={styles.h5}>Data Sources & Research</h5>
-              <div style={styles.linksGrid}>
-                <span style={styles.citeLink}>BMC Public Health</span>
-                <span style={styles.citeLink}>American Journal of Men’s Health</span>
-                <span style={styles.citeLink}>JAMA Pediatrics</span>
-                <span style={styles.citeLink}>PMC Parent Groups</span>
+            <div style={styles.linksGrid}>
+              <span style={styles.citeLink}>BMC Public Health</span>
+              <span style={styles.citeLink}>American Journal of Men’s Health</span>
+              <span style={styles.citeLink}>JAMA Pediatrics</span>
+              <span style={styles.citeLink}>PMC Parent Groups</span>
             </div>
           </div>
         </div>
@@ -616,7 +621,7 @@ const PhoneMockup = () => {
   );
 };
 
-const getStyles = (isMobile: boolean) => ({
+const getStyles = (isMobile: boolean): Record<string, React.CSSProperties> => ({
   pageWrapper: {
     fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
     color: '#1e293b',
@@ -727,6 +732,7 @@ const getStyles = (isMobile: boolean) => ({
     transition: 'background 0.2s, transform 0.1s',
     boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25)',
     marginLeft: '8px',
+    WebkitTapHighlightColor: 'transparent',
   },
 
   // Hero Section
@@ -786,6 +792,7 @@ const getStyles = (isMobile: boolean) => ({
     outline: 'none',
     boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
     transition: 'border-color 0.2s, box-shadow 0.2s',
+    WebkitAppearance: 'none',
   },
   inputSmall: {
     width: '100px',
@@ -810,6 +817,7 @@ const getStyles = (isMobile: boolean) => ({
     boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)',
     width: '100%',
     letterSpacing: '0.01em',
+    WebkitTapHighlightColor: 'transparent',
   },
   checkboxWrapper: {
     marginTop: '20px',

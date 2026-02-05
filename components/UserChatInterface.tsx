@@ -253,10 +253,10 @@ export const UserChatInterface: React.FC = () => {
 
         // Reject the transition and keep user at current step
         console.error('🚨 [SECURITY] Invalid state transition blocked:', validation.errors);
-        
+
         // Generate a contextual fallback message based on current step
         let fallbackContent = "I need to make sure I have all your information correct. ";
-        
+
         switch (profile.onboarding_step) {
           case OnboardingStep.CHILD_INFO:
             fallbackContent = "I need the birth month and year for your child. For example, 'March 2023' or 'June 2024'. When was your child born?";
@@ -277,7 +277,7 @@ export const UserChatInterface: React.FC = () => {
             // TODO: This is the fallback for system errors, but it shouldn't be. We should have a technical difficulties catch-all for when everything breaks.
             fallbackContent = "I need to make sure I have all your information correct. Let me ask you a few more questions to complete your profile.";
         }
-        
+
         // Show a contextual fallback message to the user
         const fallbackMessage: Message = {
           id: `temp-agent-${crypto.randomUUID()}`,
@@ -473,7 +473,8 @@ const styles: { [key: string]: React.CSSProperties } = {
   body: {
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif',
     background: 'white',
-    height: '100vh', // Use fixed height instead of minHeight for proper flex child sizing
+    height: '100dvh', // Modern dynamic viewport height
+    minHeight: '100vh', // Fallback for browsers that don't support dvh
     display: 'flex',
     flexDirection: 'column',
     padding: 0,
@@ -495,6 +496,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     border: 'none',
     cursor: 'pointer',
     textAlign: 'left',
+    WebkitTapHighlightColor: 'transparent',
   },
   logoSquare: {
     width: '32px',

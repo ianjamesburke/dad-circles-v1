@@ -22,11 +22,15 @@ const CookieBanner: React.FC = () => {
         // Values: 1=enabled, 0=disabled
         localStorage.setItem('cookie-consent', `1,1,${Date.now()}`);
         setIsVisible(false);
+        // Trigger tracking scripts to load
+        window.dispatchEvent(new Event('cookie-consent-updated'));
     };
 
     const handleRejectNonEssential = () => {
         localStorage.setItem('cookie-consent', `0,0,${Date.now()}`);
         setIsVisible(false);
+        // Trigger tracking scripts update (will check consent and potentially skip loading)
+        window.dispatchEvent(new Event('cookie-consent-updated'));
     };
 
     if (!isVisible) return null;
