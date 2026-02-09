@@ -16,9 +16,9 @@ Client → Cloud Function (getGeminiResponse) → Gemini API
 ```
 
 **Implementation**:
-- **Backend**: `functions/src/gemini.ts` - Secure Cloud Function with API key in Firebase Secrets
+- **Backend**: `functions/src/gemini/index.ts` - Secure Cloud Function with API key in Firebase Secrets
 - **Client**: `services/callableGeminiService.ts` - Calls the Cloud Function via `httpsCallable`
-- **Deprecated**: `services/geminiService.ts` - Old insecure implementation (DO NOT USE)
+- **Deprecated**: direct client-side Gemini API calls (do not add these)
 
 **Local Development Setup**:
 ```bash
@@ -41,7 +41,7 @@ firebase functions:secrets:set GEMINI_API_KEY
 - Audit trail for all API calls
 - Centralized cost control
 
-See `docs/GEMINI_API_SECURITY.md` for complete documentation.
+See `functions/src/gemini/index.ts` and `services/callableGeminiService.ts` for the current implementation.
 
 ### Timestamp Standardization (January 2025)
 **All timestamps now use Firestore server timestamps for consistency and security.**
@@ -100,13 +100,11 @@ We use [Just](https://github.com/casey/just) to manage development tasks.
 2. **Start Frontend**: Run `just dev` to start the Vite development server.
 
 ### Default Admin Credentials
-When working specifically in the emulator/dev environment, use these credentials to log in as admin:
-- **Email**: `admin@gmail.com`
-- **Password**: `Password123`
+Admin credentials are loaded from `.env` and seeded by `scripts/seedAdminUser.js`:
+- **Email**: `PRIMARY_ADMIN_EMAIL`
+- **Password**: `PRIMARY_ADMIN_PASSWORD`
 
-These credentials are automatically seeded when the emulators start (see `scripts/seedAdminUser.js`).
-
-Dad Circles Onboarding MVP is a conversational onboarding application built with React and Gemini 2.0 Flash LLM. The application guides new and expecting dads through a structured onboarding flow while collecting relevant user information (status, children, interests, location). The backend uses Firebase (Firestore for data, Cloud Functions for email), and the frontend is a Vite-powered React app with a test persona system and admin monitoring dashboard.
+Dad Circles Onboarding MVP is a conversational onboarding application built with React and Gemini (server-side via Cloud Functions). The application guides new and expecting dads through a structured onboarding flow while collecting relevant user information (status, children, interests, location). The backend uses Firebase (Firestore, Auth, Cloud Functions), and the frontend is a Vite-powered React app with admin tooling.
 
 ## Quick Start Commands
 
@@ -117,7 +115,7 @@ To run the application locally, you need two terminal windows:
    ```bash
    npm run emulators
    ```
-   This will start the Firebase emulators (Auth, Functions, Firestore) and seed the default admin user.
+   This will start the Firebase emulators (Auth, Functions, Firestore).
 
 2. **Start Frontend**:
    ```bash
@@ -125,14 +123,7 @@ To run the application locally, you need two terminal windows:
    ```
    This will start the Vite development server.
 
-This script will:
-- Install dependencies if needed
-- Check for .env file
-- Clean up any existing processes
-- Start Firebase emulators (Firestore, Functions, Auth)
-- Start Vite dev server
-- Show all service URLs
-- Handle cleanup on Ctrl+C
+`npm run emulators` starts Firebase emulators only. If you want emulators + admin seeding in one command, use `just emulator`.
 
 ### Individual Commands
 ```bash
@@ -142,14 +133,8 @@ npm install
 # Development server (uses Vite)
 npm run dev
 
-# Full development environment (Emulators + Vite + Seeding) [Equivalent to ./start-dev.sh]
-npm run dev:full
-
 # Development with local Gemini API key (set in command)
 npm run dev:local
-
-# Start Express server (separate, for serverless emulation)
-npm run dev:server
 
 # Build for production
 npm run build
@@ -176,7 +161,7 @@ npm run emulator:seed
 
 1. **Frontend (React/Vite)** → User interacts with chat interface or landing page
 2. **UserChatInterface.tsx** → Processes user messages, manages conversation state (production)
-3. **Gemini Service** (`services/geminiService.ts`) → Calls Google Gemini API with context, manages onboarding step logic
+3. **Gemini Client Service** (`services/callableGeminiService.ts`) → Calls `getGeminiResponse` callable with context
 4. **Database** (`database.ts`) → Firestore operations via Firebase Client SDK (profiles, messages, leads, groups)
 5. **Firebase Callable Functions** (`functions/src/callable.ts`) → Backend logic for matching, emails, magic links
 6. **Email Service** (`functions/src/emailService.ts`) → Resend template-based emails
@@ -189,8 +174,7 @@ npm run emulator:seed
 - **`/utils`** - Utilities: analytics, location helpers, logger
 - **`/config`** - Configuration files (e.g., contextConfig.ts for context window management)
 - **`/functions`** - Firebase Cloud Functions
-- **`/functions/src`** - TypeScript source: callable.ts (backend functions), emailService.ts, matching.ts, logger.ts
-- **`/tests`** - Vitest test suite with factories for test data generation
+- **`/functions/src`** - TypeScript source: callable.ts, gemini/index.ts, weekendMission.ts, emailService.ts, matching.ts, logger.ts
 
 ### Data Model
 
@@ -199,10 +183,12 @@ npm run emulator:seed
 - `name` - User's first name (captured during onboarding)
 - `onboarding_step` - Current step (enum: WELCOME, NAME, STATUS, CHILD_INFO, SIBLINGS, INTERESTS, LOCATION, CONFIRM, COMPLETE)
 - `onboarded` - Boolean indicating completion
+- `dad_status` - Current/expecting/both
 - `children` - Array of child objects with type, birth_month, birth_year, optional gender
+- `children_complete` - True when user confirms there are no additional kids
 - `siblings` - Array of existing children (captured separately)
 - `interests` - Array of user interests
-- `location` - Object with city and state_code
+- `location` - Object with city, state_code, country_code
 - `last_updated` - Timestamp of last modification
 
 **Message** (Firestore `messages` collection):
@@ -220,7 +206,7 @@ npm run emulator:seed
 > [!IMPORTANT]
 > **Data Access Pattern**:
 > 1. **Client-Side Read**: Prefer using `database.ts` (Firebase Client SDK) to read data directly from Firestore. Do not create API endpoints just to read data.
-> 2. **Backend Logic**: Use **Firebase Callable Functions** (`onCall`) for backend logic that requires safety or admin privileges (e.g., matching algorithms, emails). Call them via `database.functions.myFunction`.
+> 2. **Backend Logic**: Use **Firebase Callable Functions** (`onCall`) for backend logic that requires safety or admin privileges (e.g., matching algorithms, emails). Call them via `database.<functionName>` wrappers in `services/callableService.ts`.
 > 3. **Avoid**: Do NOT create custom Express/HTTP endpoints (`onRequest`) for internal tools. They require complex proxy configuration in Vite. Stick to standard Firebase patterns.
 
 > [!CAUTION]
@@ -262,7 +248,7 @@ npm run emulator:seed
 > - All state transitions must follow the defined state machine
 > - Validation failures are logged for security monitoring
 > 
-> See `SECURITY.md` for complete documentation.
+> See `services/onboardingValidator.ts` for the current validator rules and transition guardrails.
 
 > [!IMPORTANT]
 > **Firebase Admin SDK Timestamp Best Practices**:
@@ -347,7 +333,7 @@ When working with Cloud Functions (`functions/src/`), use the custom logger wrap
 ## Key Architectural Patterns
 
 ### Onboarding State Machine
-The system strictly follows a defined sequence of onboarding steps. The Gemini Service (`services/geminiService.ts`) receives the current `onboarding_step` and context, then returns:
+The system strictly follows a defined sequence of onboarding steps. The frontend calls `getAgentResponse` in `services/callableGeminiService.ts`, which invokes `getGeminiResponse` in `functions/src/gemini/index.ts` and returns:
 - `message` - Next agent response
 - `next_step` - Which step to transition to
 - `profile_updates` - Any profile fields to update based on extracted user information
@@ -377,14 +363,14 @@ CONFIG = {
   gemini: {
     model: 'gemini-3-flash-preview',
     timeout: 30,
-    maxOutputTokens: 512,
+    maxOutputTokens: 1024,
     temperature: 0.4,
   },
   validation: {
     maxMessageLength: 1000,      // Max chars per message
     maxHistoryLength: 50,        // Max messages in history
-    minBirthYear: 2015,
-    maxBirthYear: 2035,
+    minBirthYear: 2010,
+    maxBirthYear: 2099,
   },
   rateLimits: {
     gemini: {
@@ -418,21 +404,34 @@ contextConfigs = {
 - Context window management prevents overwhelming the Gemini API with unnecessary history while maintaining conversation state
 
 ### Firebase Emulator for Development
-The app supports Firebase emulators for local development (Firestore, Functions, Auth). The emulator can be started with `npm run emulator` or `npm run dev:full` for the complete development environment. Connection is configured in `firebase.ts` and automatically detects when running in emulator mode.
+The app supports Firebase emulators for local development (Firestore, Functions, Auth). The emulator can be started with `npm run emulator` (alias for `npm run emulators`) or `just emulator` (includes admin seeding). Connection is configured in `firebase.ts` and uses `window.location.hostname` so mobile/network testing can hit local emulators.
 
 ### Cloud Functions and Email
 
-The email system uses Resend template aliases for all emails. See `EMAIL_MIGRATION_PLAN.md` for complete flow documentation.
+The email system uses Resend template aliases for all emails.
 
 **Callable Functions** (`functions/src/callable.ts`):
+- `startSession` - Creates a new session or sends a magic link for existing users
+- `redeemMagicLink` - Exchanges token for Firebase custom auth token
 - `sendMagicLink` - Sends secure magic link to resume abandoned sessions (duplicate email detection)
 - `sendCompletionEmail` - Sends welcome email when user completes onboarding
+- `sendManualAbandonmentEmail` - Admin-triggered abandonment email
 - `runMatching` - Executes matching algorithm to form groups
 - `approveGroup` - Approves pending group and sends intro emails to members
 - `deleteGroup` - Deletes group and unmatches members
 
+**Gemini Callable Function** (`functions/src/gemini/index.ts`):
+- `getGeminiResponse` - Server-side onboarding response generation with extraction and validation helpers
+
+**Weekend Mission Functions** (`functions/src/weekendMission.ts`):
+- `generateWeekendMission`
+- `createWeekendMissionJob`
+- `getWeekendMissionJob`
+- `processWeekendMissionJob`
+
 **Scheduled Functions** (`functions/src/index.ts`):
-- `sendAbandonmentEmails` - Hourly (8am-8pm ET) recovery emails for incomplete profiles
+- `sendWelcomeEmail` is active (Firestore trigger on new leads)
+- `sendFollowUpEmails` and `sendAbandonedOnboardingEmails` are currently commented out/disabled
 
 **Email Templates** (Resend):
 - `welcome-completed` - Sent on onboarding completion
@@ -496,7 +495,7 @@ Firestore requires composite indexes for queries that filter or order on multipl
 ## Important Implementation Details
 
 ### Gemini System Prompt
-The Gemini system prompt (`services/geminiService.ts`) is highly detailed and controls the agent's behavior:
+The Gemini system prompt (`functions/src/gemini/index.ts`) is highly detailed and controls the agent's behavior:
 - Enforces the onboarding step sequence
 - Specifies response tone and style
 - Defines how to handle multiple children (critical: capture ALL children in the array)
@@ -547,24 +546,24 @@ Groups are formed through a manual approval workflow:
 
 ### Add a new onboarding step
 1. Add step to `OnboardingStep` enum in `types.ts`
-2. Update the Gemini system prompt in `services/geminiService.ts` with step logic
+2. Update the Gemini system prompt and extraction schema in `functions/src/gemini/index.ts`
 3. Update context config in `config/contextConfig.ts` if needed
 4. Test with test persona buttons
 
 ### Modify the agent's behavior
-Edit the system prompt in `services/geminiService.ts`. The prompt is the single source of truth for agent behavior—it's comprehensive and self-documenting.
+Edit the system prompt in `functions/src/gemini/index.ts`. Keep extraction schema, normalization logic, and response formatting aligned.
 
 ### Add a new data field to user profile
 1. Add field to `UserProfile` interface in `types.ts`
 2. Update the Gemini prompt to instruct extraction of this field
-3. Add extraction logic in the `getAgentResponse` function in `services/geminiService.ts`
+3. Add extraction/normalization logic in `functions/src/gemini/index.ts`
 4. Test and verify Firestore stores the new field
 
 ### Test with Firebase Emulator
 ```bash
 npm run emulator:seed
 # App will connect to local Firestore (port 8083)
-# UI available at http://localhost:4004
+# Emulator UI is typically available at http://localhost:4000
 ```
 
 ### Deploy Cloud Functions
@@ -575,133 +574,25 @@ firebase deploy --only functions
 ```
 
 ## Testing
+Automated test scripts are not currently defined in root `package.json` or `functions/package.json`.
 
-### Test Framework
-The project uses **Vitest** for unit testing with the following setup:
-- **Vitest** - Fast, Vite-native test runner
-- **@testing-library/react** - React component testing utilities
-- **@testing-library/jest-dom** - Custom DOM matchers
-- **jsdom** - Browser environment simulation
-
-### Running Tests
-
-```bash
-# Run all tests once
-npm test
-```
-
-### Test Structure
-
-```
-tests/
-├── setup.ts                    # Global test setup and mocks
-├── factories/
-│   └── index.ts               # Test data factories
-├── config/
-│   └── contextConfig.test.ts  # Config tests
-├── services/
-│   ├── contextManager.test.ts # Context management tests
-│   └── matching.test.ts       # Matching algorithm tests
-├── utils/
-│   └── contextAnalytics.test.ts # Analytics tests
-└── types.test.ts              # Type/enum tests
-```
-
-### Test Factories
-
-Use factories in `tests/factories/index.ts` to create consistent test data:
-
-```typescript
-import { 
-  createMessage, 
-  createMessages, 
-  createConversation,
-  createUserProfile,
-  createChildWithAge,
-  createExpectingChild,
-  createLocation,
-  createUsersInLocation,
-  createGroup,
-  createLead,
-  resetFactories 
-} from '../factories';
-
-// Create a single message
-const msg = createMessage({ content: 'Hello' });
-
-// Create a conversation (alternating user/agent)
-const conversation = createConversation(5); // 10 messages total
-
-// Create a user with a 6-month-old child
-const user = createUserProfile({
-  children: [createChildWithAge(6)]
-});
-
-// Create users in a specific location
-const austinDads = createUsersInLocation(4, createLocation({ city: 'Austin', state_code: 'TX' }));
-```
-
-### Writing New Tests
-
-1. **Create test file** in appropriate directory under `tests/`
-2. **Import factories** for test data
-3. **Use `beforeEach`** to reset state between tests
-4. **Follow AAA pattern**: Arrange, Act, Assert
-
-Example:
-```typescript
-import { describe, it, expect, beforeEach } from 'vitest';
-import { resetFactories, createUserProfile } from '../factories';
-
-describe('MyFeature', () => {
-  beforeEach(() => {
-    resetFactories();
-  });
-
-  it('should do something', () => {
-    // Arrange
-    const user = createUserProfile({ name: 'Test Dad' });
-    
-    // Act
-    const result = myFunction(user);
-    
-    // Assert
-    expect(result).toBe(expected);
-  });
-});
-```
-
-### Coverage
-
-Current coverage targets:
-- `services/**/*.ts` - Core business logic
-- `utils/**/*.ts` - Utility functions
-- `config/**/*.ts` - Configuration
-- `types.ts` - Type definitions
-
-Files with external dependencies (Firebase, Gemini API) are tested via integration tests or mocked.
-
-### Test-Driven Development (TDD)
-
-For TDD workflow:
-1. Run `npm run test:watch`
-2. Write a failing test
-3. Implement the minimum code to pass
-4. Refactor
-5. Repeat
+When adding tests:
+1. Add scripts to `package.json` first (for example `test`, `test:watch`).
+2. Keep AGENTS.md in sync with the actual test runner and file layout.
+3. Prefer colocated tests or a dedicated `tests/` tree, but document whichever pattern is actually used.
 
 ## Code Structure Notes
 
 - **No src/ directory**: Unlike typical React projects, source files are in the root. This is intentional for this MVP.
 - **TypeScript throughout**: All critical business logic is typed.
 - **Vite configuration**: Simple setup in `vite.config.ts`. Alias `@` points to project root.
-- **React Router**: Uses HashRouter for client-side routing (no server-side routing needed).
+- **React Router**: Uses `BrowserRouter` in `App.tsx`.
 - **No state management library**: Uses props drilling and local state. Consider adding if complexity grows.
 
 ## Troubleshooting
 
 **Start script issues (Mac/Linux)**
-- Make sure script is executable: `chmod +x start-dev.sh`
+- Use `just emulator` for seeded local emulators, or `npm run emulators` + `npm run dev` in separate terminals
 - Check log files: `firebase-emulator.log` and `vite-dev.log`
 - If ports are in use, kill existing processes: `pkill -f "firebase emulators"`
 - Ensure Firebase CLI is installed: `npm install -g firebase-tools`
