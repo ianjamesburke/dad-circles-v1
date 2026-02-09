@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <!-- Privacy Compliance Tracking Management -->
+    <script>
+        (function () {
+            window.loadTrackingScripts = function () {
+                if (window.trackingScriptsLoaded) return;
+
+                const consent = localStorage.getItem('cookie-consent');
+                if (!consent) return;
+
+                const [analytics, marketing] = consent.split(',');
+                // Only load if marketing consent ('1') is given
+                if (marketing !== '1') return;
+
+                window.trackingScriptsLoaded = true;
+                console.log('Privacy Compliance: Loading marketing tracking scripts (GTM & Meta)');
+
+                // Google Tag Manager
+                (function (w, d, s, l, i) {
+                    w[l] = w[l] || []; w[l].push({
+                        'gtm.start':
+                            new Date().getTime(), event: 'gtm.js'
+                    }); var f = d.getElementsByTagName(s)[0],
+                        j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : ''; j.async = true; j.src =
+                            'https://www.googletagmanager.com/gtm.js?id=' + i + dl; f.parentNode.insertBefore(j, f);
+                })(window, document, 'script', 'dataLayer', 'GTM-WT8SCNS9');
+
+                // Meta Pixel Code
+                !function (f, b, e, v, n, t, s) {
+                    if (f.fbq) return; n = f.fbq = function () {
+                        n.callMethod ?
+                            n.callMethod.apply(n, arguments) : n.queue.push(arguments)
+                    };
+                    if (!f._fbq) f._fbq = n; n.push = n; n.loaded = !0; n.version = '2.0';
+                    n.queue = []; t = b.createElement(e); t.async = !0;
+                    t.src = v; s = b.getElementsByTagName(e)[0];
+                    s.parentNode.insertBefore(t, s)
+                }(window, document, 'script',
+                    'https://connect.facebook.net/en_US/fbevents.js');
+                fbq('init', '1219309430092459');
+                fbq('track', 'PageView');
+            };
+
+            // Check on initial load
+            window.loadTrackingScripts();
+
+            // Listen for consent updates from the React application
+            window.addEventListener('cookie-consent-updated', function () {
+                window.loadTrackingScripts();
+            });
+        })();
+    </script>
+    <!-- End Privacy Compliance Tracking -->
+    <title>Dad Circles | Community for New & Expecting Dads</title>
+    <meta name="description"
+        content="Join Dad Circles to connect with other dads, share experiences, and find support in your parenting journey. A conversation-driven onboarding experience for modern fathers.">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://dadcircles.com/">
+    <meta property="og:title" content="Dad Circles | Community for New & Expecting Dads">
+    <meta property="og:description"
+        content="Connect with other dads in your area. Share the journey of fatherhood with a supportive community.">
+    <meta property="og:image" content="/og-image.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://dadcircles.com/">
+    <meta property="twitter:title" content="Dad Circles | Community for New & Expecting Dads">
+    <meta property="twitter:description"
+        content="Connect with other dads in your area. Share the journey of fatherhood with a supportive community.">
+    <meta property="twitter:image" content="/og-image.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            min-height: 100%;
+            overflow-x: hidden;
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        #root {
+            width: 100%;
+            min-height: 100vh;
+        }
+
+        /* Prevent mobile Safari from zooming on input focus */
+        @media screen and (max-width: 768px) {
+
+            input,
+            textarea,
+            select {
+                font-size: 16px !important;
+            }
+        }
+
+        /* Chat page: lock body so only the message list scrolls */
+        body.chat-page {
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
+
+        @keyframes bounce {
+
+            0%,
+            80%,
+            100% {
+                transform: translateY(0);
+            }
+
+            40% {
+                transform: translateY(-8px);
+            }
+        }
+
+        @keyframes fadeSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 text-slate-900">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+</body>
+
+</html>

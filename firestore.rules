@@ -1,0 +1,53 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+
+    function isSessionOwner(sessionId) {
+      return request.auth != null && request.auth.uid == sessionId;
+    }
+
+    // Admin Only: Groups
+    // Only authenticated users (admins) can view or modify groups
+    match /groups/{groupId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Leads:
+    // - Create: Public (Landing Page)
+    // - Read: Public (Landing Page needs to check existence) - TODO: Secure this via Cloud Function
+    // - Update: Public (addLead function requires setDoc after addDoc to save document ID)
+    // - Delete: Admin only
+    // TODO: Move lead creation to a Cloud Function for better security
+    match /leads/{leadId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Profiles: Public (User Chat uses session IDs)
+    // TODO: Implement anonymous auth for users to secure this
+    match /profiles/{profileId} {
+      allow read, write: if isAdmin() || isSessionOwner(profileId);
+    }
+
+    // Messages: Public (User Chat)
+    // TODO: Implement anonymous auth for users to secure this
+    match /messages/{messageId} {
+      allow create: if isAdmin() || (request.auth != null && request.resource.data.session_id == request.auth.uid);
+      allow read, update, delete: if isAdmin() || (request.auth != null && resource.data.session_id == request.auth.uid);
+    }
+
+    // Default: Deny other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

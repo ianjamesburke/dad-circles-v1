@@ -1,0 +1,1646 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { database } from '../database';
+import { signInWithCustomToken } from 'firebase/auth';
+import { auth } from '../firebase';
+import { BLOG_POSTS } from '../utils/blogData';
+import { getLocationFromPostcode } from '../utils/location';
+import { VersionDisplay } from './VersionDisplay';
+
+const LandingPage: React.FC = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [email, setEmail] = useState('');
+  const [postcode, setPostcode] = useState('');
+  const [signupForOther, setSignupForOther] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isMobile, setIsMobile] = useState(false);
+  const [copiedText, setCopiedText] = useState<string | null>(null);
+  const [showShareDropdown, setShowShareDropdown] = useState(false);
+  const [showNavShareDropdown, setShowNavShareDropdown] = useState(false);
+  const [showMobileNav, setShowMobileNav] = useState(false);
+  const [isProofCardHovered, setIsProofCardHovered] = useState(false);
+
+  // Capture UTM parameters from URL on landing
+  const utmParams = useMemo(() => {
+    const utm: Record<string, string> = {};
+    const keys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
+    for (const key of keys) {
+      const value = searchParams.get(key);
+      if (value) utm[key] = value;
+    }
+    return Object.keys(utm).length > 0 ? utm : undefined;
+  }, [searchParams]);
+
+  const START_SESSION_TIMEOUT_MS = 12000;
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setErrorMessage('');
+    console.info('startSession: submit');
+
+    let timeoutId: number | undefined;
+    try {
+      console.info('startSession: submit', { utmParams });
+      const startSessionPromise = database.startSession(email, postcode, signupForOther, utmParams);
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = window.setTimeout(() => {
+          reject(new Error('startSession_timeout'));
+        }, START_SESSION_TIMEOUT_MS);
+      });
+      const result = await Promise.race([startSessionPromise, timeoutPromise]);
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+      console.info('startSession: response', { status: result?.status });
+
+      if (result?.status === 'magic_link_sent') {
+        setErrorMessage(
+          "Check your inbox - we've sent you a secure link to continue your session."
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (result?.status === 'signup_other_recorded') {
+        setShowSuccess(true);
+        setEmail('');
+        setPostcode('');
+        setSignupForOther(false);
+        setTimeout(() => setShowSuccess(false), 5000);
+        return;
+      }
+
+      if (result?.status === 'session_created' && result?.authToken) {
+        await signInWithCustomToken(auth, result.authToken);
+
+        // Fetch and store location data immediately so it's available for the onboarding agent
+        void (async () => {
+          try {
+            const locationInfo = await getLocationFromPostcode(postcode);
+            if (locationInfo && result.sessionId) {
+              await database.updateProfile(result.sessionId, {
+                location: {
+                  city: locationInfo.city,
+                  state_code: locationInfo.stateCode,
+                  country_code: locationInfo.countryCode,
+                }
+              });
+            }
+          } catch (error) {
+            console.error('Error pre-fetching location:', error);
+          }
+        })();
+
+        navigate(`/chat`);
+        return;
+      }
+
+      throw new Error('Unexpected response from server');
+
+    } catch (error) {
+      const err: any = error;
+      if (err?.message === 'startSession_timeout') {
+        console.warn('startSession: timeout');
+        setErrorMessage('Request timed out. Please try again.');
+      } else {
+        console.error('Error submitting lead:', error);
+      }
+      if (err?.code === 'functions/resource-exhausted') {
+        setErrorMessage(err.message || 'Too many requests. Please try again later.');
+      } else if (err?.message !== 'startSession_timeout') {
+        setErrorMessage('Something went wrong. Please try again.');
+      }
+    } finally {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+      setIsSubmitting(false);
+    }
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedText(label);
+    setTimeout(() => setCopiedText(null), 2000);
+  };
+
+  const styles = getStyles(isMobile);
+
+  return (
+    <div style={styles.pageWrapper}>
+      {/* Navigation / Header */}
+      <div style={styles.navWrapper}>
+        <header style={styles.nav}>
+        <div style={styles.logo} onClick={() => navigate('/')}>
+          <div style={styles.logoSquare}>DC</div>
+          <div style={styles.logoText}>DadCircles</div>
+        </div>
+
+        {isMobile && (
+          <button
+            onClick={() => setShowMobileNav(!showMobileNav)}
+            style={styles.mobileMenuToggle}
+          >
+            <i className={`fas ${showMobileNav ? 'fa-times' : 'fa-bars'}`}></i>
+          </button>
+        )}
+
+        <div style={{
+          ...styles.navLinks,
+          display: isMobile && !showMobileNav ? 'none' : 'flex',
+          width: isMobile ? '100%' : 'auto',
+          boxSizing: 'border-box' as const,
+          textAlign: 'center' as const
+        }}>
+          <a href="#founders" style={styles.navLink} onClick={() => setShowMobileNav(false)}>Our Story</a>
+          <a href="#how-it-works" style={styles.navLink} onClick={() => setShowMobileNav(false)}>How it works</a>
+          <a href="#why-it-matters" style={styles.navLink} onClick={() => setShowMobileNav(false)}>Why this matters</a>
+          <a href="#roadmap" style={styles.navLink} onClick={() => setShowMobileNav(false)}>Roadmap</a>
+
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowNavShareDropdown(!showNavShareDropdown)}
+              style={styles.navShareButton}
+            >
+              Share
+            </button>
+            {showNavShareDropdown && (
+              <div style={{ ...styles.shareDropdown, top: 'calc(100% + 12px)', right: 0, left: 'auto', transform: 'none' }}>
+                <a
+                  onClick={() => {
+                    copyToClipboard("I found something called DadCircles. It matches local Dads and makes it easy to meet up. Thought of you. Want an invite? https://dadcircles.com", "copy");
+                    setShowNavShareDropdown(false);
+                    if (isMobile) setShowMobileNav(false);
+                  }}
+                  style={styles.shareDropdownOption}
+                >
+                  <i className="fas fa-copy" style={{ width: '20px' }}></i> Social post
+                </a>
+                <a
+                  onClick={() => {
+                    const text = "I just joined DadCircles. It matches local Dads by stage of fatherhood and helps the group actually meet up. If you’re an expecting/new dad (or know one), sign up here and invite a friend: https://dadcircles.com";
+                    copyToClipboard(text, "linkedin");
+                    window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent('https://dadcircles.com')}`, '_blank');
+                    setShowNavShareDropdown(false);
+                    if (isMobile) setShowMobileNav(false);
+                  }}
+                  style={styles.shareDropdownOption}
+                >
+                  <i className="fab fa-linkedin" style={{ width: '20px' }}></i> LinkedIn
+                </a>
+                <a
+                  onClick={() => {
+                    const text = "DadCircles is building local dad groups (matched by stage + postcode) and doing the follow-up so meetups actually happen. Join + invite a friend: https://dadcircles.com";
+                    copyToClipboard(text, "twitter");
+                    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank');
+                    setShowNavShareDropdown(false);
+                    if (isMobile) setShowMobileNav(false);
+                  }}
+                  style={styles.shareDropdownOption}
+                >
+                  <i className="fab fa-twitter" style={{ width: '20px' }}></i> Twitter
+                </a>
+                <a
+                  href={`mailto:?subject=${encodeURIComponent('Check out DadCircles')}&body=${encodeURIComponent('I found something called DadCircles. It matches local Dads and makes it easy to meet up. Thought of you. Want an invite? https://dadcircles.com')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => {
+                    setShowNavShareDropdown(false);
+                    if (isMobile) setShowMobileNav(false);
+                  }}
+                  style={styles.shareDropdownOption}
+                >
+                  <i className="fas fa-envelope" style={{ width: '20px' }}></i> Email
+                </a>
+                <a
+                  href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent('https://dadcircles.com')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => {
+                    setShowNavShareDropdown(false);
+                    if (isMobile) setShowMobileNav(false);
+                  }}
+                  style={styles.shareDropdownOption}
+                >
+                  <i className="fab fa-facebook" style={{ width: '20px' }}></i> Facebook
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+      </div>
+
+      {/* Hero Section */}
+      <section id="join" style={styles.heroSection}>
+        <div style={styles.container}>
+          <div style={styles.heroGrid}>
+            <div style={styles.heroContent}>
+              <h1 style={styles.h1}>Real Dads.<br /><span style={styles.highlight}> Local Circles.</span></h1>
+              <p style={styles.heroSub}>
+                We connect you with nearby Dads at the same stage of fatherhood.
+                We handle matching, and meetup recommendations so a real groups actually form.
+              </p>
+
+              <form style={styles.heroForm} onSubmit={handleSubmit}>
+                <div style={styles.inputGroup}>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    required
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    style={styles.input}
+                  />
+                  <input
+                    type="text"
+                    value={postcode}
+                    onChange={(e) => setPostcode(e.target.value)}
+                    placeholder="Zipcode"
+                    required
+                    autoCapitalize="characters"
+                    autoComplete="postal-code"
+                    autoCorrect="off"
+                    style={styles.inputSmall}
+                  />
+                </div>
+                <button type="submit" disabled={isSubmitting} style={styles.primaryButton}>
+                  {isSubmitting ? 'Joining...' : 'Join DadCircles'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/mission')}
+                  style={styles.missionButton}
+                >
+                  Try Weekend Mission (no email)
+                </button>
+              </form>
+
+              <div style={styles.checkboxWrapper}>
+                <label style={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={signupForOther}
+                    onChange={(e) => setSignupForOther(e.target.checked)}
+                    style={styles.checkbox}
+                  />
+                  <span style={styles.checkboxText}>I'm signing up for someone else.</span>
+                </label>
+              </div>
+
+              {showSuccess && <div style={styles.successBox}>✓ You're on the list! Check your email.</div>}
+              {errorMessage && <div style={styles.errorBox}>⚠ {errorMessage}</div>}
+            </div>
+
+            {!isMobile && (
+              <div style={styles.heroVisual}>
+                <PhoneMockup />
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section id="how-it-works" style={styles.section}>
+        <div style={styles.container}>
+          <div style={styles.sectionHeader}>
+            <h2 style={styles.h2}>How it works</h2>
+            <p style={styles.sectionSub}>For Dads who want a local crew.</p>
+          </div>
+
+          <div style={styles.stepsGrid}>
+            <div style={styles.stepCard}>
+              <div style={styles.stepNumber}>1</div>
+              <h3 style={styles.h3}>Tell us about you</h3>
+              <p style={styles.p}>2-min profile: Your zipcode, child's age, and interests.</p>
+            </div>
+            <div style={styles.stepCard}>
+              <div style={styles.stepNumber}>2</div>
+              <h3 style={styles.h3}>We match you</h3>
+              <p style={styles.p}>Small local cohorts based on zipcode and interests.</p>
+            </div>
+            <div style={styles.stepCard}>
+              <div style={styles.stepNumber}>3</div>
+              <h3 style={styles.h3}>We launch the group</h3>
+              <p style={styles.p}>You get an intro and a simple plan to meet up. We follow up.</p>
+            </div>
+          </div>
+
+          <div style={styles.howItWorksBanner}>
+            <span style={styles.howItWorksBannerPill}>ANN ARBOR DADS ONLY</span>
+            <h3 style={styles.howItWorksBannerTitle}>Launch a Weekend Mission</h3>
+            <p style={styles.howItWorksBannerSub}>We'll design a weekend mission for you. Find events and activities near you.</p>
+            <span style={styles.howItWorksBannerCta}>No sign up required.</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Why This Matters (Research) */}
+      <section id="why-it-matters" style={styles.sectionLight}>
+        <div style={styles.container}>
+          <div style={styles.sectionHeader}>
+            <h2 style={styles.h2}>Why This Matters</h2>
+            <p style={styles.sectionSub}>This isn’t a “nice to have.” Connection matters for Dads, Kids and families.</p>
+          </div>
+
+          <div style={styles.researchGrid}>
+            <div style={styles.researchItem}>
+              <div style={styles.researchIcon}>🧠</div>
+              <h4 style={styles.h4}>Isolation is a risk</h4>
+              <p style={styles.researchText}>
+                Low social support predicts paternal depression.
+                <strong> Dads need Dads.</strong>
+              </p>
+            </div>
+            <div style={styles.researchItem}>
+              <div style={styles.researchIcon}>🤝</div>
+              <h4 style={styles.h4}>Connection reduces distress</h4>
+              <p style={styles.researchText}>
+                Peer support is protective against anxiety and depression.
+              </p>
+            </div>
+            <div style={styles.researchItem}>
+              <div style={styles.researchIcon}>👨‍👩‍👧</div>
+              <h4 style={styles.h4}>Dad health = Kid health</h4>
+              <p style={styles.researchText}>
+                Your wellbeing is a direct investment in your child's growth.
+              </p>
+            </div>
+            <div style={styles.researchItem}>
+              <div style={styles.researchIcon}>🏗️</div>
+              <h4 style={styles.h4}>Proven Infrastructure</h4>
+              <p style={styles.researchText}>
+                This model works for Mums. We’re adapting the proven social infrastructure for Dads.
+              </p>
+            </div>
+          </div>
+          <div style={styles.citationBox}>
+            <h5 style={styles.h5}>Data Sources & Research</h5>
+            <div style={styles.linksGrid}>
+              <span style={styles.citeLink}>BMC Public Health</span>
+              <span style={styles.citeLink}>American Journal of Men’s Health</span>
+              <span style={styles.citeLink}>JAMA Pediatrics</span>
+              <span style={styles.citeLink}>PMC Parent Groups</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Founders Story Section */}
+      <section id="founders" style={styles.storySection}>
+        <div style={styles.container}>
+          <div style={styles.storyCard}>
+            <h2 style={styles.storyTitle}>Why we built DadCircles</h2>
+            <div style={styles.storyContent}>
+              <p style={styles.pLarge}>
+                I’m Nelson. I’m a dad of two kids under four. After I became a Dad, I realized something quietly but clearly: my life had shifted out of sync with my friendships. My circle of male friends did not have any kids and their timeline was years away.
+              </p>
+              <p style={styles.pLarge}>
+                Like many dads, I didn’t feel unhappy, just increasingly isolated.
+              </p>
+              <p style={styles.pLarge}>
+                I very slowly formed new connections indirectly, through my partner. Her Mum’s group was a constant for her. They shared milestones, compared notes, vented, laughed, and showed up for each other week after week, month after month, milestone after milestone. Over time, those connections turned into real, lasting friendships, the kind you build a phase of life around.
+              </p>
+              <p style={styles.pLarge}>
+                I didn’t see anything like that for Dads.
+              </p>
+              <p style={styles.pLarge}>
+                There was no default place to land. No local group going through the same stage. No gentle structure to turn “we should catch up sometime” into actual time together. And no space where celebrating wins, talking through challenges, or just hanging out felt routine or easy.
+              </p>
+              <p style={styles.pLarge}>
+                That gap felt obvious and fixable.
+              </p>
+              <p style={styles.pLarge}>
+                DadCircles exists to give Dads a small, local group of peers at similar life stages, lightly facilitated so it actually forms. Not a support group. Not a forum. Just real people, nearby, with enough structure to lower the friction to socialise.
+              </p>
+              <p style={styles.pLarge}>
+                We’re starting locally with real dads, learning fast, and building carefully. City by city. The goal is to make fatherhood feel a little less lonely, and a lot more shared.
+              </p>
+              <p style={styles.pLarge}>
+                For Dads. For Kids. For Families.
+              </p>
+              <div style={styles.signature}>
+                <strong>Nelson & Ian</strong><br />
+                Founders of DadCircles
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Development Roadmap */}
+      <section id="roadmap" style={styles.roadmapSection}>
+        <div style={styles.container}>
+          <div style={styles.sectionHeader}>
+            <h2 style={styles.h2}>Development Roadmap</h2>
+            <p style={styles.sectionSub}>Building a community for dads, one stage at a time</p>
+          </div>
+
+          <div style={styles.roadmapTimeline}>
+            <div style={styles.roadmapTimelineLine} />
+            <div style={{ ...styles.roadmapStage, ...styles.roadmapStageCurrent }}>
+              <div style={{ ...styles.roadmapMarker, ...styles.roadmapMarkerCurrent }} />
+              <div style={styles.roadmapStageContent}>
+                <span style={styles.roadmapBadgeCurrent}>Current: Early Alpha</span>
+                <h3 style={styles.h3}>Foundation & Local Testing</h3>
+                <ul style={styles.roadmapFeatures}>
+                  <li style={styles.roadmapFeatureItem}><span style={styles.roadmapFeatureCheck}>✓</span> Weekend missions with local activities</li>
+                  <li style={styles.roadmapFeatureItem}><span style={styles.roadmapFeatureCheck}>✓</span> Supporting Dads in Ann Arbor & Ypsilanti, Michigan</li>
+                  <li style={styles.roadmapFeatureItem}><span style={styles.roadmapFeatureCheck}>✓</span> Testing core sign up and early matching</li>
+                </ul>
+              </div>
+            </div>
+
+            <div style={{ ...styles.roadmapStage, ...styles.roadmapStageEven }}>
+              <div style={styles.roadmapMarker} />
+              <div style={{ ...styles.roadmapStageContent, ...styles.roadmapStageContentEven }}>
+                <span style={styles.roadmapBadgeUpcoming}>Beta V2</span>
+                <h3 style={styles.h3}>Enhanced Onboarding & Matching</h3>
+                <ul style={styles.roadmapFeatures}>
+                  <li style={styles.roadmapFeatureItem}><span style={styles.roadmapFeatureCheck}>✓</span> Instant onboard call assistance</li>
+                  <li style={styles.roadmapFeatureItem}><span style={styles.roadmapFeatureCheck}>✓</span> Streamlined member experience</li>
+                  <li style={styles.roadmapFeatureItem}><span style={styles.roadmapFeatureCheck}>✓</span> Testing core group formation and engagement</li>
+                </ul>
+              </div>
+            </div>
+
+            <div style={styles.roadmapStage}>
+              <div style={styles.roadmapMarker} />
+              <div style={styles.roadmapStageContent}>
+                <span style={styles.roadmapBadgeUpcoming}>Beta V3</span>
+                <h3 style={styles.h3}>Community Growth & Local Engagement</h3>
+                <ul style={styles.roadmapFeatures}>
+                  <li style={styles.roadmapFeatureItem}><span style={styles.roadmapFeatureCheck}>✓</span> Group facilitation and follow-up systems</li>
+                  <li style={styles.roadmapFeatureItem}><span style={styles.roadmapFeatureCheck}>✓</span> Partnership events with local organizations</li>
+                  <li style={styles.roadmapFeatureItem}><span style={styles.roadmapFeatureCheck}>✓</span> Expanding community engagement</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div style={styles.roadmapFuture}>
+            <h3 style={{ ...styles.h2, marginBottom: '30px', textAlign: 'center' }}>Future Enhancements</h3>
+            <div style={styles.roadmapEnhancementGrid}>
+              <div style={styles.roadmapEnhancementCard}>
+                <h4 style={styles.h4}>Geographic Expansion</h4>
+                <p style={styles.p}>Currently focused on Ann Arbor & Ypsilanti, Michigan for early signups. This will inform how DadCircles matches Dads based on community demand and group formation patterns. We recommend signing up is your are from another region as this signals a vote for future expansion.</p>
+              </div>
+              <div style={styles.roadmapEnhancementCard}>
+                <h4 style={styles.h4}>AI Community Moderation</h4>
+                <p style={styles.p}>Leveraging AI to help moderate local dad circles, keeping them supportive and safe. Features include personalized 1:1 messaging, group prompts, and localized recommendations to improve matched-to-active group conversion rates.</p>
+              </div>
+              <div style={styles.roadmapEnhancementCard}>
+                <h4 style={styles.h4}>Smoother Onboarding Experience</h4>
+                <p style={styles.p}>Introducing AI voice onboarding alongside email and messaging options. Testing different communication mediums to match individual preferences and optimize the path from sign-up to participation.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Why It Works / Social Proof */}
+      <section
+        style={styles.socialProofSection}
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+      >
+        <div style={styles.container}>
+          <div
+            style={{
+              ...styles.proofCard,
+              ...(isProofCardHovered ? styles.proofCardHover : {})
+            }}
+            onMouseEnter={() => setIsProofCardHovered(true)}
+            onMouseLeave={() => setIsProofCardHovered(false)}
+          >
+            <div style={styles.vibeTag}>FIRST COHORTS FORMING NOW</div>
+            <h2 style={styles.h2Dark}>Join the early circle</h2>
+            <p style={styles.pDark}>Dad groups don’t happen by accident. We provide the lightweight structure to make them stick: local, practical, and consistent.</p>
+            <div style={styles.proofNote}>Be an early Dad. Help shape the experience.</div>
+          </div>
+        </div>
+      </section>
+
+      {/* Blog Section (Placeholder) */}
+      <section style={styles.blogSection}>
+        <div style={styles.container}>
+          <div style={styles.sectionHeader}>
+            <h2 style={styles.h2}>Latest from the Circle</h2>
+            <p style={styles.sectionSub}>Tips, stories, and research on fatherhood and connection.</p>
+          </div>
+          <div style={styles.blogGrid}>
+            {BLOG_POSTS.slice(0, 3).map((post) => (
+              <Link to={`/blog/${post.slug}`} key={post.id} style={styles.blogCard}>
+                <div style={{ height: '200px', background: '#e2e8f0', overflow: 'hidden' }}>
+                  <img src={post.cover_image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+                <div style={styles.blogContent}>
+                  <span style={styles.blogDate}>{new Date(post.published_at?.toMillis?.() || post.published_at || 0).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                  <h4 style={styles.blogTitle}>{post.title}</h4>
+                  <p style={styles.blogExcerpt}>{post.excerpt}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+          <div style={{ textAlign: 'center', marginTop: '56px' }}>
+            <Link to="/blog" style={{ ...styles.citeLink, fontSize: '1.1rem' }}>View All Articles <i className="fas fa-arrow-right"></i></Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Invite/Share Section */}
+      <section style={styles.shareSection}>
+        <div style={styles.container}>
+          <div style={styles.shareContainer}>
+            <h2 style={styles.h2White}>Know a dad who’d benefit?</h2>
+            <p style={styles.sectionSubWhite}>Help us build the early community by inviting a friend.</p>
+
+            <div style={{ position: 'relative', marginTop: '48px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '24px', flexDirection: isMobile ? 'column' : 'row' }}>
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setShowShareDropdown(!showShareDropdown)}
+                  style={styles.shareMainButton}
+                >
+                  <i className="fas fa-share-alt"></i> Share DadCircles
+                </button>
+
+                {showShareDropdown && (
+                  <div style={styles.shareDropdown}>
+                    <a
+                      onClick={() => {
+                        copyToClipboard("I found something called DadCircles. It matches local Dads and makes it easy to meet up. Thought of you. Want an invite? https://dadcircles.com", "copy");
+                        setShowShareDropdown(false);
+                      }}
+                      style={styles.shareDropdownOption}
+                    >
+                      <i className="fas fa-copy" style={{ width: '20px' }}></i> Social post
+                    </a>
+                    <a
+                      onClick={() => {
+                        const text = "I just joined DadCircles. It matches local Dads by stage of fatherhood and helps the group actually meet up. If you’re an expecting/new dad (or know one), sign up here and invite a friend: https://dadcircles.com";
+                        copyToClipboard(text, "linkedin");
+                        window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent('https://dadcircles.com')}`, '_blank');
+                        setShowShareDropdown(false);
+                      }}
+                      style={styles.shareDropdownOption}
+                    >
+                      <i className="fab fa-linkedin" style={{ width: '20px' }}></i> LinkedIn
+                    </a>
+                    <a
+                      onClick={() => {
+                        const text = "DadCircles is building local dad groups (matched by stage + postcode) and doing the follow-up so meetups actually happen. Join + invite a friend: https://dadcircles.com";
+                        copyToClipboard(text, "twitter");
+                        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank');
+                        setShowShareDropdown(false);
+                      }}
+                      style={styles.shareDropdownOption}
+                    >
+                      <i className="fab fa-twitter" style={{ width: '20px' }}></i> Twitter
+                    </a>
+                    <a
+                      href={`mailto:?subject=${encodeURIComponent('Check out DadCircles')}&body=${encodeURIComponent('I found something called DadCircles. It matches local Dads and makes it easy to meet up. Thought of you. Want an invite? https://dadcircles.com')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => {
+                        setShowShareDropdown(false);
+                      }}
+                      style={styles.shareDropdownOption}
+                    >
+                      <i className="fas fa-envelope" style={{ width: '20px' }}></i> Email
+                    </a>
+                    <a
+                      href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent('https://dadcircles.com')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => {
+                        setShowShareDropdown(false);
+                      }}
+                      style={styles.shareDropdownOption}
+                    >
+                      <i className="fab fa-facebook" style={{ width: '20px' }}></i> Facebook
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {copiedText && (
+                <div style={{ fontSize: '1rem', color: '#bbf7d0', fontWeight: 700, minWidth: '200px', textAlign: isMobile ? 'center' : 'left' }}>
+                  ✓ Link copied!
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer style={styles.footer}>
+        <div style={styles.container}>
+          <div style={styles.footerContent}>
+            <div style={styles.footerBrand}>
+              <div style={styles.footerBrandRow}>
+                <div style={styles.logoSquareSmall}>DC</div>
+                <span style={{ fontWeight: 700 }}>DadCircles</span>
+              </div>
+              <div style={{ fontSize: '0.9rem', color: '#64748b' }}>Built with care.</div>
+            </div>
+
+            <div style={styles.footerLinks}>
+              <Link to="/terms" style={styles.iconLink}>Terms</Link>
+              <Link to="/privacy" style={styles.iconLink}>Privacy</Link>
+              <Link to="/cookies" style={styles.iconLink}>Cookies</Link>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '24px', marginTop: '40px' }}>
+            <Link
+              to="/blog"
+              style={{ ...styles.iconLink, fontSize: '1.25rem' }}
+              aria-label="Blog"
+            >
+              <i className="fas fa-newspaper"></i>
+            </Link>
+            <a
+              href="https://www.linkedin.com/company/dadcircles"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ ...styles.iconLink, fontSize: '1.25rem' }}
+              aria-label="LinkedIn"
+            >
+              <i className="fab fa-linkedin"></i>
+            </a>
+            <a
+              href="mailto:info@dadcircles.com"
+              style={{ ...styles.iconLink, fontSize: '1.25rem' }}
+              aria-label="Contact us via email"
+            >
+              <i className="fas fa-envelope"></i>
+            </a>
+          </div>
+
+          <div style={styles.footerNote}>
+            DadCircles is in early Alpha. First cohorts forming now.
+          </div>
+
+          <VersionDisplay style={{ marginTop: '16px' }} />
+        </div>
+      </footer>
+    </div >
+  );
+};
+
+// Internal Phone Mockup Component with rotating images
+const PhoneMockup = () => {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const images = [
+    '/images/chat-1.png',
+    '/images/chat-2.png',
+    '/images/chat-3.png',
+    '/images/chat-4.png'
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prev: number) => (prev + 1) % images.length);
+    }, 4000); // Rotate every 4 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div style={{
+      position: 'relative',
+      width: '300px',
+      height: '600px',
+      background: '#1e293b',
+      borderRadius: '40px',
+      border: '12px solid #1e293b',
+      boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+      overflow: 'hidden',
+    }}>
+      {/* Notch */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: '120px',
+        height: '30px',
+        background: '#1e293b',
+        borderBottomLeftRadius: '16px',
+        borderBottomRightRadius: '16px',
+        zIndex: 20
+      }}></div>
+
+      {/* Screen Content */}
+      <div style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        background: '#ffffff',
+        overflow: 'hidden'
+      }}>
+        {images.map((img, index) => (
+          <img
+            key={index}
+            src={img}
+            alt={`Interface Preview ${index + 1}`}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              opacity: index === currentImageIndex ? 1 : 0,
+              transition: 'opacity 0.8s ease-in-out'
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const getStyles = (isMobile: boolean): Record<string, React.CSSProperties> => ({
+  pageWrapper: {
+    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
+    color: '#1e293b',
+    background: '#ffffff',
+    fontSize: isMobile ? '16px' : '18px', // Base font size increase
+  },
+  container: {
+    maxWidth: '1200px',
+    margin: '0 auto',
+    padding: isMobile ? '0 20px' : '0 32px',
+    width: '100%',
+    boxSizing: 'border-box' as const,
+  },
+  navWrapper: {
+    position: 'sticky' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+    zIndex: 1000,
+    background: '#ffffff',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+  },
+  nav: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: isMobile ? '20px 0' : '32px 0',
+    maxWidth: '1200px',
+    margin: '0 auto',
+    paddingLeft: isMobile ? '20px' : '32px',
+    paddingRight: isMobile ? '20px' : '32px',
+    width: '100%',
+    boxSizing: 'border-box' as const,
+  },
+  logo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  logoSquare: {
+    width: '40px',
+    height: '40px',
+    background: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
+    borderRadius: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'white',
+    fontWeight: 800,
+    fontSize: '1.2rem',
+    boxShadow: '0 10px 15px -3px rgba(99, 102, 241, 0.3)',
+  },
+  logoSquareSmall: {
+    width: '28px',
+    height: '28px',
+    background: '#6366f1',
+    borderRadius: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'white',
+    fontWeight: 700,
+    fontSize: '0.8rem',
+  },
+  logoText: {
+    fontSize: '1.5rem',
+    fontWeight: 700,
+    letterSpacing: '-0.02em',
+    color: '#0f172a',
+  },
+  navLinks: {
+    display: 'flex',
+    gap: isMobile ? '16px' : '40px',
+    flexWrap: 'wrap' as const,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...(isMobile ? {
+      position: 'absolute' as const,
+      top: '100%',
+      left: 0,
+      right: 0,
+      background: 'white',
+      flexDirection: 'column' as const,
+      padding: '24px',
+      boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+      gap: '24px',
+      zIndex: 100,
+    } : {})
+  },
+  mobileMenuToggle: {
+    background: 'transparent',
+    border: 'none',
+    fontSize: '1.5rem',
+    color: '#0f172a',
+    cursor: 'pointer',
+    padding: '8px',
+  },
+  navLink: {
+    color: '#64748b',
+    textDecoration: 'none',
+    fontWeight: 500,
+    fontSize: '1rem',
+    transition: 'color 0.2s',
+    cursor: 'pointer',
+  },
+  navShareButton: {
+    background: '#6366f1',
+    color: 'white',
+    padding: '8px 20px',
+    borderRadius: '100px',
+    fontSize: '0.95rem',
+    fontWeight: 700,
+    border: 'none',
+    cursor: 'pointer',
+    transition: 'background 0.2s, transform 0.1s',
+    boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25)',
+    marginLeft: '8px',
+    WebkitTapHighlightColor: 'transparent',
+  },
+
+  // Hero Section
+  heroSection: {
+    padding: isMobile ? '40px 0 60px' : '100px 0 140px',
+    background: 'radial-gradient(circle at top right, #e0e7ff 0%, #ffffff 60%)',
+  },
+  heroGrid: {
+    display: 'grid',
+    gridTemplateColumns: isMobile ? '1fr' : '1.2fr 1fr',
+    gap: isMobile ? '48px' : '80px',
+    alignItems: 'center',
+  },
+  heroContent: {
+    textAlign: isMobile ? 'center' as const : 'left' as const,
+  },
+  h1: {
+    fontSize: isMobile ? '2.5rem' : '4.5rem',
+    fontWeight: 900,
+    lineHeight: 1.1,
+    color: '#0f172a',
+    marginBottom: '24px',
+    letterSpacing: '-0.03em',
+  },
+  highlight: {
+    background: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text',
+  },
+  heroSub: {
+    fontSize: isMobile ? '1.1rem' : '1.35rem',
+    lineHeight: 1.6,
+    color: '#475569',
+    marginBottom: '48px',
+    maxWidth: isMobile ? '100%' : '560px',
+  },
+  heroForm: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '16px',
+    maxWidth: '430px',
+    margin: isMobile ? '0 auto' : '0',
+  },
+  inputGroup: {
+    display: 'flex',
+    gap: '12px',
+    width: '100%',
+  },
+  input: {
+    flex: 1,
+    padding: '18px 20px',
+    borderRadius: '16px',
+    border: '1px solid #e2e8f0',
+    fontSize: '1rem',
+    background: 'white',
+    outline: 'none',
+    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+    transition: 'border-color 0.2s, box-shadow 0.2s',
+    WebkitAppearance: 'none',
+  },
+  inputSmall: {
+    width: '100px',
+    padding: '18px 12px',
+    borderRadius: '16px',
+    border: '1px solid #e2e8f0',
+    fontSize: '1rem',
+    textAlign: 'center' as const,
+    outline: 'none',
+    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+  },
+  primaryButton: {
+    background: '#0f172a',
+    color: 'white',
+    padding: '20px 32px',
+    borderRadius: '16px',
+    fontSize: '1.1rem',
+    fontWeight: 600,
+    border: 'none',
+    cursor: 'pointer',
+    transition: 'transform 0.1s, background 0.2s, box-shadow 0.2s',
+    boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)',
+    width: '100%',
+    letterSpacing: '0.01em',
+    WebkitTapHighlightColor: 'transparent',
+  },
+  missionButton: {
+    marginTop: '4px',
+    background: 'white',
+    color: '#1e293b',
+    padding: '16px 24px',
+    borderRadius: '16px',
+    fontSize: '1rem',
+    fontWeight: 600,
+    border: '1px solid #cbd5e1',
+    cursor: 'pointer',
+    width: '100%',
+    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+    transition: 'transform 0.1s, background 0.2s',
+    WebkitTapHighlightColor: 'transparent',
+  },
+  checkboxWrapper: {
+    marginTop: '20px',
+    display: 'flex',
+    justifyContent: isMobile ? 'center' : 'flex-start',
+  },
+  checkboxLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    cursor: 'pointer',
+  },
+  checkbox: {
+    width: '20px',
+    height: '20px',
+    accentColor: '#6366f1',
+  },
+  checkboxText: {
+    fontSize: '0.95rem',
+    color: '#64748b',
+  },
+  successBox: {
+    marginTop: '24px',
+    background: '#f0fdf4',
+    color: '#166534',
+    padding: '16px 20px',
+    borderRadius: '12px',
+    fontSize: '0.95rem',
+    fontWeight: 500,
+    border: '1px solid #bbf7d0',
+  },
+  errorBox: {
+    marginTop: '24px',
+    background: '#fef2f2',
+    color: '#991b1b',
+    padding: '16px 20px',
+    borderRadius: '12px',
+    fontSize: '0.95rem',
+    fontWeight: 500,
+    border: '1px solid #fecaca',
+  },
+  heroVisual: {
+    display: 'flex',
+    justifyContent: 'center',
+    position: 'relative' as const,
+  },
+  imageCard: {
+    // Legacy support if needed, but PhoneMockup uses inline styles
+    background: 'white',
+    padding: '12px',
+    borderRadius: '32px',
+    boxShadow: '0 50px 100px -20px rgba(0,0,0,0.15)',
+  },
+  heroImage: {
+    width: '100%',
+    borderRadius: '24px',
+    display: 'block',
+  },
+  floatingTag: {
+    // Legacy
+    position: 'absolute' as const,
+  },
+
+  // Sections
+  section: {
+    padding: isMobile ? '48px 0' : '140px 0',
+    background: '#ffffff',
+  },
+  sectionLight: {
+    padding: isMobile ? '48px 0' : '140px 0',
+    background: '#f8fafc',
+  },
+  sectionHeader: {
+    textAlign: 'center' as const,
+    marginBottom: isMobile ? '32px' : '80px',
+    maxWidth: '800px',
+    margin: isMobile ? '0 auto 32px' : '0 auto 80px',
+  },
+  h2: {
+    fontSize: isMobile ? '2.25rem' : '3.5rem',
+    fontWeight: 800,
+    color: '#0f172a',
+    marginBottom: '20px',
+    letterSpacing: '-0.02em',
+  },
+  h2White: {
+    fontSize: isMobile ? '2.25rem' : '3.5rem',
+    fontWeight: 800,
+    color: '#ffffff',
+    marginBottom: '20px',
+    letterSpacing: '-0.02em',
+  },
+  h2Dark: {
+    fontSize: isMobile ? '2.25rem' : '3.5rem',
+    fontWeight: 800,
+    color: '#ffffff',
+    marginBottom: '20px',
+    letterSpacing: '-0.02em',
+  },
+  sectionSub: {
+    fontSize: isMobile ? '1.1rem' : '1.35rem',
+    color: '#64748b',
+    lineHeight: 1.6,
+    maxWidth: '600px',
+    margin: '0 auto',
+  },
+  sectionSubWhite: {
+    fontSize: isMobile ? '1.1rem' : '1.35rem',
+    color: '#cbd5e1',
+    lineHeight: 1.6,
+    maxWidth: '600px',
+    margin: '0 auto',
+  },
+
+  // How it works
+  stepsGrid: {
+    display: 'grid',
+    gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr',
+    gap: isMobile ? '32px' : '48px',
+  },
+  stepCard: {
+    padding: isMobile ? '24px 20px' : '40px',
+    borderRadius: isMobile ? '16px' : '24px',
+    background: '#f8fafc',
+    position: 'relative' as const,
+    transition: 'transform 0.2s',
+  },
+  stepNumber: {
+    width: isMobile ? '40px' : '48px',
+    height: isMobile ? '40px' : '48px',
+    background: '#6366f1',
+    color: 'white',
+    borderRadius: isMobile ? '12px' : '14px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: 800,
+    marginBottom: isMobile ? '20px' : '32px',
+    fontSize: isMobile ? '1.1rem' : '1.25rem',
+    boxShadow: '0 8px 16px -4px rgba(99, 102, 241, 0.3)',
+  },
+  howItWorksBanner: {
+    marginTop: isMobile ? '48px' : '64px',
+    padding: isMobile ? '32px 24px' : '48px 40px',
+    background: '#0f172a',
+    borderRadius: '28px',
+    textAlign: 'center' as const,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    gap: '16px',
+  },
+  howItWorksBannerPill: {
+    display: 'inline-block',
+    padding: '8px 20px',
+    background: 'rgba(99, 102, 241, 0.35)',
+    color: '#e0e7ff',
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    letterSpacing: '0.1em',
+    borderRadius: '999px',
+    textTransform: 'uppercase' as const,
+  },
+  howItWorksBannerTitle: {
+    fontSize: isMobile ? '1.35rem' : '1.75rem',
+    fontWeight: 800,
+    color: '#ffffff',
+    margin: 0,
+    letterSpacing: '-0.02em',
+    lineHeight: 1.3,
+  },
+  howItWorksBannerSub: {
+    fontSize: isMobile ? '1rem' : '1.1rem',
+    color: '#e2e8f0',
+    lineHeight: 1.6,
+    margin: 0,
+    maxWidth: '520px',
+  },
+  howItWorksBannerCta: {
+    fontSize: isMobile ? '0.95rem' : '1rem',
+    color: '#818cf8',
+    fontWeight: 600,
+    marginTop: '8px',
+  },
+  h3: {
+    fontSize: '1.5rem',
+    fontWeight: 700,
+    marginBottom: '12px',
+    color: '#0f172a',
+    letterSpacing: '-0.01em',
+  },
+  p: {
+    fontSize: '1.05rem',
+    lineHeight: 1.6,
+    color: '#475569',
+  },
+  pSmall: {
+    fontSize: '1rem',
+    lineHeight: 1.6,
+    color: '#475569',
+    marginBottom: '0px',
+  },
+
+  // Social Proof
+  socialProofSection: {
+    padding: isMobile ? '32px 0' : '80px 0',
+    cursor: 'pointer',
+  },
+  proofCard: {
+    background: '#0f172a',
+    borderRadius: isMobile ? '24px' : '40px',
+    padding: isMobile ? '40px 20px' : '100px 80px',
+    textAlign: 'center' as const,
+    color: '#ffffff',
+    boxShadow: '0 40px 80px -20px rgba(15, 23, 42, 0.4)',
+    cursor: 'pointer',
+    transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease',
+  },
+  proofCardHover: {
+    transform: 'translateY(-4px)',
+  },
+  vibeTag: {
+    display: 'inline-block',
+    background: 'rgba(99, 102, 241, 0.2)',
+    color: '#818cf8',
+    padding: '8px 20px',
+    borderRadius: '100px',
+    fontSize: '0.85rem',
+    fontWeight: 700,
+    letterSpacing: '0.1em',
+    marginBottom: '32px',
+  },
+  pDark: {
+    fontSize: isMobile ? '1.25rem' : '1.5rem',
+    lineHeight: 1.6,
+    color: '#94a3b8',
+    marginBottom: '32px',
+    maxWidth: '700px',
+    margin: '0 auto 32px',
+  },
+  proofNote: {
+    fontSize: '1.1rem',
+    fontWeight: 600,
+    color: '#6366f1',
+    marginTop: '40px',
+  },
+
+  // Research
+  researchGrid: {
+    display: 'grid',
+    gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+    gap: isMobile ? '16px' : '40px',
+    marginBottom: isMobile ? '24px' : '60px',
+  },
+  researchItem: {
+    display: 'flex',
+    flexDirection: isMobile ? 'column' as const : 'row' as const,
+    gap: isMobile ? '12px' : '24px',
+    background: 'white',
+    padding: isMobile ? '20px 16px' : '40px',
+    borderRadius: isMobile ? '16px' : '24px',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+    alignItems: isMobile ? 'flex-start' : 'flex-start',
+  },
+  researchIcon: {
+    fontSize: isMobile ? '1.5rem' : '2rem',
+    background: '#eff6ff',
+    width: isMobile ? '48px' : '64px',
+    height: isMobile ? '48px' : '64px',
+    borderRadius: isMobile ? '12px' : '16px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  h4: {
+    fontSize: '1.25rem',
+    fontWeight: 700,
+    marginBottom: '8px',
+    color: '#1e293b',
+  },
+  h4White: {
+    fontSize: '1.25rem',
+    fontWeight: 700,
+    marginBottom: '12px',
+    color: '#f8fafc',
+  },
+  researchText: {
+    fontSize: '1rem',
+    lineHeight: 1.6,
+    color: '#64748b',
+  },
+  citationBox: {
+    background: '#f1f5f9',
+    padding: isMobile ? '20px 16px' : '48px',
+    borderRadius: isMobile ? '16px' : '24px',
+    maxWidth: '600px',
+    margin: '0 auto',
+    textAlign: 'center' as const,
+  },
+  h5: {
+    fontSize: '0.85rem',
+    fontWeight: 700,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.05em',
+    color: '#94a3b8',
+    marginBottom: isMobile ? '16px' : '24px',
+  },
+  linksGrid: {
+    display: 'flex',
+    flexDirection: isMobile ? 'column' as const : 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: isMobile ? '8px' : '24px',
+    justifyContent: 'center',
+  },
+  citeLink: {
+    fontSize: '0.9rem',
+    color: '#64748b',
+    fontWeight: 600,
+  },
+
+  // Story
+  storySection: {
+    padding: isMobile ? '60px 0' : '100px 0',
+    background: '#0f172a',
+    color: '#ffffff',
+  },
+  storyCard: {
+    maxWidth: '800px',
+    margin: '0 auto',
+  },
+  storyTitle: {
+    fontSize: isMobile ? '1.75rem' : '2.5rem',
+    fontWeight: 800,
+    color: '#ffffff',
+    marginBottom: '12px',
+    letterSpacing: '-0.02em',
+  },
+  storyContent: {
+    marginTop: '32px',
+  },
+  pLarge: {
+    fontSize: isMobile ? '1.1rem' : '1.2rem',
+    lineHeight: 1.7,
+    color: '#cbd5e1',
+    marginBottom: '24px',
+    fontWeight: 300,
+  },
+  signature: {
+    marginTop: '40px',
+    paddingTop: '24px',
+    borderTop: '1px solid rgba(255,255,255,0.1)',
+    color: '#818cf8',
+    fontSize: '1.2rem',
+  },
+
+  // Share
+  shareSection: {
+    padding: isMobile ? '80px 0' : '120px 0',
+    background: 'linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)',
+    color: 'white',
+    zIndex: 10,
+    position: 'relative' as const,
+  },
+  shareContainer: {
+    maxWidth: '700px',
+    margin: '0 auto',
+    textAlign: 'center' as const,
+  },
+  shareMainButton: {
+    background: '#ffffff',
+    color: '#4338ca',
+    padding: '20px 40px',
+    borderRadius: '100px',
+    fontSize: '1.25rem',
+    fontWeight: 700,
+    border: 'none',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+    transition: 'transform 0.2s, box-shadow 0.2s',
+  },
+  shareDropdown: {
+    position: 'absolute' as const,
+    top: 'calc(100% + 12px)',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    background: '#ffffff',
+    borderRadius: '20px',
+    overflow: 'hidden',
+    boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
+    width: '240px',
+    zIndex: 100,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    padding: '8px',
+  },
+  shareDropdownOption: {
+    padding: '16px 20px',
+    color: '#1e293b',
+    textDecoration: 'none',
+    fontSize: '1rem',
+    fontWeight: 600,
+    textAlign: 'left' as const,
+    cursor: 'pointer',
+    borderRadius: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    transition: 'background 0.2s',
+  },
+
+  // Blog
+  blogSection: {
+    padding: isMobile ? '80px 0' : '140px 0',
+    background: '#f8fafc',
+  },
+  blogGrid: {
+    display: 'grid',
+    gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+    gap: '32px',
+    marginTop: '56px',
+  },
+  blogCard: {
+    background: 'white',
+    borderRadius: '24px',
+    overflow: 'hidden',
+    boxShadow: '0 4px 10px -2px rgba(0,0,0,0.05)',
+    transition: 'transform 0.2s, box-shadow 0.2s',
+    cursor: 'pointer',
+    border: '1px solid #f1f5f9',
+  },
+  blogContent: {
+    padding: '32px 24px',
+  },
+  blogDate: {
+    fontSize: '0.85rem',
+    color: '#64748b',
+    marginBottom: '10px',
+    display: 'block',
+    fontWeight: 500,
+  },
+  blogTitle: {
+    fontSize: '1.25rem',
+    fontWeight: 700,
+    color: '#0f172a',
+    marginBottom: '10px',
+    lineHeight: 1.4,
+    letterSpacing: '-0.01em',
+  },
+  blogExcerpt: {
+    fontSize: '1rem',
+    color: '#475569',
+    lineHeight: 1.6,
+  },
+
+  // Roadmap
+  roadmapSection: {
+    padding: isMobile ? '80px 0' : '140px 0',
+    background: '#f8fafc',
+  },
+  roadmapTimeline: {
+    position: 'relative' as const,
+    padding: '20px 0',
+    ...(isMobile
+      ? {}
+      : {
+          paddingLeft: 0,
+          paddingRight: 0,
+        }),
+  },
+  roadmapTimelineLine: {
+    position: 'absolute' as const,
+    left: isMobile ? '19px' : '50%',
+    top: 0,
+    bottom: 0,
+    width: '4px',
+    background: 'linear-gradient(180deg, #6366f1 0%, #4338ca 100%)',
+    borderRadius: '2px',
+    transform: isMobile ? 'none' : 'translateX(-50%)',
+    zIndex: 0,
+    pointerEvents: 'none' as const,
+  },
+  roadmapStage: {
+    display: 'flex',
+    marginBottom: isMobile ? '40px' : '60px',
+    position: 'relative' as const,
+    zIndex: 1,
+    ...(isMobile
+      ? { flexDirection: 'row' as const }
+      : {
+          flexDirection: 'row' as const,
+          justifyContent: 'flex-start',
+        }),
+  },
+  roadmapStageCurrent: {},
+  roadmapStageEven: isMobile ? {} : { flexDirection: 'row-reverse' as const },
+  roadmapStageContentEven: isMobile ? {} : { marginLeft: 'auto', marginRight: 0 },
+  roadmapMarker: {
+    position: 'absolute' as const,
+    left: isMobile ? '9px' : '50%',
+    top: '32px',
+    ...(isMobile ? { transform: 'translateX(-50%)' } : { transform: 'translate(-50%, 0)' }),
+    width: '20px',
+    height: '20px',
+    background: 'white',
+    border: '4px solid #6366f1',
+    borderRadius: '50%',
+    zIndex: 1,
+    boxShadow: '0 0 0 4px #f8fafc',
+  },
+  roadmapMarkerCurrent: {
+    width: '28px',
+    height: '28px',
+    border: '4px solid #4338ca',
+    background: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
+    boxShadow: '0 0 0 6px rgba(99, 102, 241, 0.2)',
+    ...(isMobile ? { left: '6px', transform: 'translateX(-50%)' } : { transform: 'translate(-50%, 0)' }),
+  },
+  roadmapStageContent: {
+    width: isMobile ? 'calc(100% - 50px)' : '45%',
+    marginLeft: isMobile ? '50px' : undefined,
+    marginRight: isMobile ? undefined : 'auto',
+    background: 'white',
+    minWidth: 0,
+    padding: isMobile ? '24px' : '30px',
+    borderRadius: '16px',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+    border: '1px solid #f1f5f9',
+  },
+  roadmapBadgeCurrent: {
+    display: 'inline-block',
+    padding: '6px 16px',
+    borderRadius: '100px',
+    fontSize: '0.875rem',
+    fontWeight: 700,
+    marginBottom: '16px',
+    background: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
+    color: 'white',
+    boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25)',
+  },
+  roadmapBadgeUpcoming: {
+    display: 'inline-block',
+    padding: '6px 16px',
+    borderRadius: '100px',
+    fontSize: '0.875rem',
+    fontWeight: 600,
+    marginBottom: '16px',
+    background: '#e2e8f0',
+    color: '#64748b',
+  },
+  roadmapFeatures: {
+    listStyle: 'none',
+    margin: 0,
+    padding: 0,
+    marginTop: '16px',
+  },
+  roadmapFeatureItem: {
+    padding: '10px 0',
+    paddingLeft: '28px',
+    position: 'relative' as const,
+    color: '#475569',
+    fontSize: '1.05rem',
+    lineHeight: 1.5,
+  },
+  roadmapFeatureCheck: {
+    position: 'absolute' as const,
+    left: 0,
+    color: '#6366f1',
+    fontWeight: 700,
+    fontSize: '1.1rem',
+  },
+  roadmapFuture: {
+    marginTop: isMobile ? '60px' : '80px',
+    background: 'white',
+    padding: isMobile ? '32px' : '48px',
+    borderRadius: '24px',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+    border: '1px solid #f1f5f9',
+  },
+  roadmapEnhancementGrid: {
+    display: 'grid',
+    gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(280px, 1fr))',
+    gap: '24px',
+    marginTop: '24px',
+  },
+  roadmapEnhancementCard: {
+    padding: '24px',
+    borderLeft: '4px solid #6366f1',
+    background: '#f8fafc',
+    borderRadius: '12px',
+  },
+
+  // Footer
+  footer: {
+    padding: isMobile ? '60px 0 40px' : '100px 0 40px',
+    background: '#ffffff',
+    borderTop: '1px solid #e2e8f0',
+  },
+  footerContent: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    flexDirection: isMobile ? 'column' as const : 'row' as const,
+    gap: '48px',
+  },
+  footerBrand: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '20px',
+  },
+  footerBrandRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  footerLinks: {
+    display: 'flex',
+    gap: '32px',
+    alignItems: 'center',
+    flexDirection: isMobile ? 'column' as const : 'row' as const,
+  },
+  iconLink: {
+    color: '#64748b',
+    fontSize: '1.1rem',
+    transition: 'color 0.2s',
+    textDecoration: 'none',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    fontWeight: 500,
+  },
+  footerNote: {
+    marginTop: '60px',
+    paddingTop: '32px',
+    borderTop: '1px solid #f1f5f9',
+    textAlign: 'center' as const,
+    color: '#94a3b8',
+    fontSize: '0.95rem',
+    fontWeight: 500,
+  }
+});
+
+export default LandingPage;

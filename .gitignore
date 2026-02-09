@@ -1,0 +1,70 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Firebase logs
+firebase-debug.log
+firestore-debug.log
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Local development scripts (contain API keys)
+dev-local.bat
+dev-local.ps1
+
+# Temporary development files
+check-database.js
+reset-database.js
+seed-database.js
+mobile-test.html
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.firebase/hosting.ZGlzdA.cache
+
+# Testing
+coverage
+functions/src/resend-test.ts
+playwright-report
+test-results
+dad-circles-firebase-adminsdk-fbsvc-45c643e993.json
+
+# Deployment tracking
+.last-deploy-version
+
+# Build artifacts
+functions/lib/
+
+# Debug/build logs
+functions/debug.log
+functions-build.log
+vite-dev.log
+
+# OS files
+**/.DS_Store
+
+/internal-docs/*
+
