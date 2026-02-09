@@ -1,18 +1,40 @@
 # Dad Circles
 
-A conversational onboarding application that connects new and expecting dads with local peer groups through AI-powered matching.
+**🔗 Live Demo: [https://dadcircles.com/](https://dadcircles.com/)**
 
-## 🛠️ Tech Stack
+An AI-powered platform that connects new and expecting dads with local peer support groups through conversational onboarding and intelligent matching.
+
+## 🎯 What is Dad Circles?
+
+Dad Circles addresses the isolation many new fathers face by creating local peer support groups. The platform uses a conversational AI interface powered by Google Gemini to guide dads through onboarding, collecting information about their children, interests, and location in a natural, engaging way. Once onboarded, our matching algorithm connects dads with similar profiles in their area to form small, local support circles.
+
+**Key Features:**
+- 🤖 **Conversational Onboarding** - Natural language chat interface powered by Gemini 2.0 Flash
+- 🎯 **Smart Matching** - Algorithm matches dads based on child age, location, and interests
+- 📧 **Automated Engagement** - Email flows for abandoned sessions, group introductions, and follow-ups
+- 👥 **Group Management** - Admin dashboard for reviewing and approving matched groups
+
+## 🏗️ Architecture
+
+Dad Circles uses a modern serverless architecture:
 
 **Frontend:**
-- React 19 + Vite
-- Tailwind CSS
-- React Router
+- React 19 + Vite for fast, responsive UI
+- Tailwind CSS for styling
+- Real-time Firestore integration
 
 **Backend:**
-- Firebase (Firestore, Cloud Functions, Auth, Hosting)
-- Google Gemini API (via Cloud Functions)
-- Resend (Email service)
+- Firebase Cloud Functions for serverless compute
+- Firestore for user profiles, messages, and group data
+- Google Gemini 2.0 Flash for conversational AI (server-side only)
+- Resend for transactional emails with template management
+- Firebase Auth for admin authentication
+
+**Key Design Decisions:**
+- All LLM calls are server-side to protect API keys and enable rate limiting
+- Onboarding state machine with validation to prevent prompt injection
+- Server timestamps throughout for consistency and security
+- Modular admin dashboard for scalable group management
 
 ## 🚀 Quick Start
 
@@ -83,4 +105,14 @@ A conversational onboarding application that connects new and expecting dads wit
 
 ## 📚 Documentation
 
-See `AGENTS.md` for detailed architecture, development workflow, and coding guidelines.
+- **`AGENTS.md`** - Comprehensive architecture, development workflow, and coding guidelines
+- **`APP_SUMMARY.md`** - High-level product overview and feature documentation
+- **`internal-docs/`** - Security audit reports and compliance documentation
+
+## 🤝 Contributing
+
+This project was built for a hackathon. For development guidelines, see `AGENTS.md`.
+
+## 📄 License
+
+MIT
