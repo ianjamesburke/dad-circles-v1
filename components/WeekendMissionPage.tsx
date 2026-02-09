@@ -294,7 +294,10 @@ const WeekendMissionPage: React.FC = () => {
             <div style={styles.fieldBlockWide}>
               <label htmlFor="postcode" style={styles.label}>Postcode</label>
               <div style={styles.infoBox}>
-                <span style={styles.infoIcon}>ℹ️</span>
+                <svg style={styles.infoIcon} width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="8" cy="8" r="7" stroke="#3b82f6" strokeWidth="1.5" fill="none"/>
+                  <path d="M8 7V11M8 5V5.5" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
                 <p style={styles.infoBoxText}>We're currently focusing on the Ann Arbor area (zip codes starting with 48).</p>
               </div>
               <input
