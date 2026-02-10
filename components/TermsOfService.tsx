@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import Footer from './Footer';
 
 const TermsOfService: React.FC = () => {
     const navigate = useNavigate();
@@ -97,33 +98,13 @@ const TermsOfService: React.FC = () => {
                     <section style={styles.section}>
                         <h2 style={styles.h2}>9. Contact</h2>
                         <p style={styles.p}>
-                            If you have any questions about these Terms, please contact us at help@dadcircles.com.
+                            If you have any questions about these Terms, please contact us at info@dadcircles.com.
                         </p>
                     </section>
                 </div>
             </div>
 
-            {/* Footer */}
-            <footer style={styles.footer}>
-                <div style={styles.container}>
-                    <div style={styles.footerContent}>
-                        <div style={styles.footerBrand}>
-                            <div style={styles.footerBrandRow}>
-                                <div style={styles.logoSquareSmall}>DC</div>
-                                <span style={{ fontWeight: 700 }}>DadCircles</span>
-                            </div>
-                            <div style={{ fontSize: '0.9rem', color: '#64748b' }}>© 2026 DadCircles Inc.</div>
-                        </div>
-                        <div style={styles.footerLinks}>
-                            <Link to="/terms" style={styles.iconLink}>Terms</Link>
-                            <Link to="/privacy" style={styles.iconLink}>Privacy</Link>
-                            <Link to="/cookies" style={styles.iconLink}>Cookies</Link>
-                            <a href="https://www.linkedin.com/company/dadcircles" target="_blank" rel="noopener noreferrer" style={styles.iconLink}>LinkedIn</a>
-                            <Link to="/" style={styles.iconLink}>Home</Link>
-                        </div>
-                    </div>
-                </div>
-            </footer>
+            <Footer />
         </div>
     );
 };
@@ -238,41 +219,6 @@ const getStyles = (isMobile: boolean) => ({
         color: '#475569',
         marginBottom: '8px',
     },
-    footer: {
-        padding: '60px 0',
-        borderTop: '1px solid #f1f5f9',
-        marginTop: 'auto',
-    },
-    footerContent: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexDirection: isMobile ? 'column' as const : 'row' as const,
-        gap: '24px',
-        maxWidth: '1200px',
-        margin: '0 auto',
-    },
-    footerBrand: {
-        display: 'flex',
-        flexDirection: 'column' as const,
-        gap: '8px',
-        alignItems: isMobile ? 'center' : 'flex-start',
-    },
-    footerBrandRow: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-    },
-    footerLinks: {
-        display: 'flex',
-        gap: '24px',
-    },
-    iconLink: {
-        color: '#64748b',
-        fontSize: '0.9rem',
-        textDecoration: 'none',
-        fontWeight: 500,
-    }
 });
 
 export default TermsOfService;

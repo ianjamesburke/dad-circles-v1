@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { BLOG_POSTS } from '../utils/blogData';
+import Footer from './Footer';
 
 const BlogPage: React.FC = () => {
     const navigate = useNavigate();
@@ -76,39 +77,7 @@ const BlogPage: React.FC = () => {
                 </div>
             </section>
 
-            {/* Footer */}
-            <footer style={styles.footer}>
-                <div style={styles.container}>
-                    <div style={styles.footerContent}>
-                        <div style={styles.footerBrand}>
-                            <div style={styles.footerBrandRow}>
-                                <div style={styles.logoSquareSmall}>DC</div>
-                                <span style={{ fontWeight: 700 }}>DadCircles</span>
-                            </div>
-                            <div style={{ fontSize: '0.9rem', color: '#64748b' }}>© 2026 DadCircles Inc.</div>
-                        </div>
-
-                        <div style={styles.footerLinks}>
-                            <Link to="/terms" style={styles.iconLink}>Terms</Link>
-                            <Link to="/privacy" style={styles.iconLink}>Privacy</Link>
-                            <Link to="/cookies" style={styles.iconLink}>Cookies</Link>
-                            <Link to="/" style={styles.iconLink}>Home</Link>
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '40px' }}>
-                        <a
-                            href="https://www.linkedin.com/company/dadcircles"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ ...styles.iconLink, fontSize: '1.25rem' }}
-                            aria-label="LinkedIn"
-                        >
-                            <i className="fab fa-linkedin"></i>
-                        </a>
-                    </div>
-                </div>
-            </footer>
+            <Footer />
         </div>
     );
 };
@@ -291,39 +260,6 @@ const getStyles = (isMobile: boolean) => ({
         display: 'flex',
         alignItems: 'center',
     },
-    footer: {
-        padding: '80px 0 40px',
-        background: '#ffffff',
-        borderTop: '1px solid #f1f5f9',
-    },
-    footerContent: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexDirection: isMobile ? 'column' as const : 'row' as const,
-        gap: '32px',
-    },
-    footerBrand: {
-        display: 'flex',
-        flexDirection: 'column' as const,
-        gap: '12px',
-        alignItems: isMobile ? 'center' : 'flex-start',
-    },
-    footerBrandRow: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-    },
-    footerLinks: {
-        display: 'flex',
-        gap: '24px',
-    },
-    iconLink: {
-        color: '#64748b',
-        fontSize: '0.95rem',
-        textDecoration: 'none',
-        fontWeight: 500,
-    }
 });
 
 export default BlogPage;

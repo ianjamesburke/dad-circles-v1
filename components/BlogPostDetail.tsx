@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { BLOG_POSTS } from '../utils/blogData';
+import Footer from './Footer';
 
 const BlogPostDetail: React.FC = () => {
     const { slug } = useParams<{ slug: string }>();
@@ -146,39 +147,7 @@ const BlogPostDetail: React.FC = () => {
                 </div>
             </article>
 
-            {/* Footer */}
-            <footer style={styles.footer}>
-                <div style={styles.container}>
-                    <div style={styles.footerContent}>
-                        <div style={styles.footerBrand}>
-                            <div style={styles.footerBrandRow}>
-                                <div style={styles.logoSquareSmall}>DC</div>
-                                <span style={{ fontWeight: 700 }}>DadCircles</span>
-                            </div>
-                            <div style={{ fontSize: '0.9rem', color: '#64748b' }}>© 2026 DadCircles Inc.</div>
-                        </div>
-                        <div style={styles.footerLinks}>
-                            <Link to="/terms" style={styles.iconLink}>Terms</Link>
-                            <Link to="/privacy" style={styles.iconLink}>Privacy</Link>
-                            <Link to="/cookies" style={styles.iconLink}>Cookies</Link>
-                            <Link to="/blog" style={styles.iconLink}>More Articles</Link>
-                            <Link to="/" style={styles.iconLink}>Home</Link>
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '40px' }}>
-                        <a
-                            href="https://www.linkedin.com/company/dadcircles"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ ...styles.iconLink, fontSize: '1.25rem' }}
-                            aria-label="LinkedIn"
-                        >
-                            <i className="fab fa-linkedin"></i>
-                        </a>
-                    </div>
-                </div>
-            </footer>
+            <Footer />
         </div>
     );
 };
@@ -392,39 +361,6 @@ const getStyles = (isMobile: boolean) => ({
         cursor: 'pointer',
         boxShadow: '0 10px 20px rgba(0,0,0,0.1)',
     },
-    footer: {
-        padding: '60px 0',
-        borderTop: '1px solid #f1f5f9',
-        marginTop: '40px',
-    },
-    footerContent: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexDirection: isMobile ? 'column' as const : 'row' as const,
-        gap: '24px',
-    },
-    footerBrand: {
-        display: 'flex',
-        flexDirection: 'column' as const,
-        gap: '8px',
-        alignItems: isMobile ? 'center' : 'flex-start',
-    },
-    footerBrandRow: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-    },
-    footerLinks: {
-        display: 'flex',
-        gap: '24px',
-    },
-    iconLink: {
-        color: '#64748b',
-        fontSize: '0.9rem',
-        textDecoration: 'none',
-        fontWeight: 500,
-    }
 });
 
 export default BlogPostDetail;

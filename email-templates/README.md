@@ -10,6 +10,7 @@ This directory contains the HTML templates used for transactional emails sent vi
 - **signup-other.html**: Sent when a user signs up on behalf of someone else.
 - **followup-3day.html**: Nurture email sent 3 days after sign-up.
 - **group-intro.html**: Sent when a group is approved and active.
+- **early-testers-update.html**: One-off update to early testers. Send after a **3 day delay** (72 hours), not 1 day. Content: local response, matching review, Mission feature in Ann Arbor, sit tight ask. No Resend template or send logic; use manually or with a one-off script.
 
 ## Formatting Guidelines
 

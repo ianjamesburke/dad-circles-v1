@@ -5,7 +5,7 @@ import { signInWithCustomToken } from 'firebase/auth';
 import { auth } from '../firebase';
 import { BLOG_POSTS } from '../utils/blogData';
 import { getLocationFromPostcode } from '../utils/location';
-import { VersionDisplay } from './VersionDisplay';
+import Footer from './Footer';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -166,10 +166,7 @@ const LandingPage: React.FC = () => {
           boxSizing: 'border-box' as const,
           textAlign: 'center' as const
         }}>
-          <a href="#founders" style={styles.navLink} onClick={() => setShowMobileNav(false)}>Our Story</a>
-          <a href="#how-it-works" style={styles.navLink} onClick={() => setShowMobileNav(false)}>How it works</a>
-          <a href="#why-it-matters" style={styles.navLink} onClick={() => setShowMobileNav(false)}>Why this matters</a>
-          <a href="#roadmap" style={styles.navLink} onClick={() => setShowMobileNav(false)}>Roadmap</a>
+          <Link to="/mission" style={styles.navLink} onClick={() => setShowMobileNav(false)}>Try a Mission</Link>
 
           <div style={{ position: 'relative' }}>
             <button
@@ -289,7 +286,8 @@ const LandingPage: React.FC = () => {
                   onClick={() => navigate('/mission')}
                   style={styles.missionButton}
                 >
-                  Try Weekend Mission (no email)
+                  <span>Try a Weekend Mission</span>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 400, opacity: 0.85, marginTop: '2px' }}>Free! No sign up required (Ann Arbor Only)</span>
                 </button>
               </form>
 
@@ -650,58 +648,7 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer style={styles.footer}>
-        <div style={styles.container}>
-          <div style={styles.footerContent}>
-            <div style={styles.footerBrand}>
-              <div style={styles.footerBrandRow}>
-                <div style={styles.logoSquareSmall}>DC</div>
-                <span style={{ fontWeight: 700 }}>DadCircles</span>
-              </div>
-              <div style={{ fontSize: '0.9rem', color: '#64748b' }}>Built with care.</div>
-            </div>
-
-            <div style={styles.footerLinks}>
-              <Link to="/terms" style={styles.iconLink}>Terms</Link>
-              <Link to="/privacy" style={styles.iconLink}>Privacy</Link>
-              <Link to="/cookies" style={styles.iconLink}>Cookies</Link>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '24px', marginTop: '40px' }}>
-            <Link
-              to="/blog"
-              style={{ ...styles.iconLink, fontSize: '1.25rem' }}
-              aria-label="Blog"
-            >
-              <i className="fas fa-newspaper"></i>
-            </Link>
-            <a
-              href="https://www.linkedin.com/company/dadcircles"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ ...styles.iconLink, fontSize: '1.25rem' }}
-              aria-label="LinkedIn"
-            >
-              <i className="fab fa-linkedin"></i>
-            </a>
-            <a
-              href="mailto:info@dadcircles.com"
-              style={{ ...styles.iconLink, fontSize: '1.25rem' }}
-              aria-label="Contact us via email"
-            >
-              <i className="fas fa-envelope"></i>
-            </a>
-          </div>
-
-          <div style={styles.footerNote}>
-            DadCircles is in early Alpha. First cohorts forming now.
-          </div>
-
-          <VersionDisplay style={{ marginTop: '16px' }} />
-        </div>
-      </footer>
+      <Footer />
     </div >
   );
 };
@@ -713,7 +660,9 @@ const PhoneMockup = () => {
     '/images/chat-1.png',
     '/images/chat-2.png',
     '/images/chat-3.png',
-    '/images/chat-4.png'
+    '/images/chat-4.png',
+    '/images/chat-5.png',
+    '/images/chat-6.png'
   ];
 
   useEffect(() => {
@@ -852,7 +801,7 @@ const getStyles = (isMobile: boolean): Record<string, React.CSSProperties> => ({
   },
   navLinks: {
     display: 'flex',
-    gap: isMobile ? '16px' : '40px',
+    gap: isMobile ? '16px' : '24px',
     flexWrap: 'wrap' as const,
     justifyContent: 'center',
     alignItems: 'center',
@@ -896,7 +845,6 @@ const getStyles = (isMobile: boolean): Record<string, React.CSSProperties> => ({
     cursor: 'pointer',
     transition: 'background 0.2s, transform 0.1s',
     boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25)',
-    marginLeft: '8px',
     WebkitTapHighlightColor: 'transparent',
   },
 
@@ -998,6 +946,9 @@ const getStyles = (isMobile: boolean): Record<string, React.CSSProperties> => ({
     boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
     transition: 'transform 0.1s, background 0.2s',
     WebkitTapHighlightColor: 'transparent',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
   },
   checkboxWrapper: {
     marginTop: '20px',
@@ -1593,54 +1544,6 @@ const getStyles = (isMobile: boolean): Record<string, React.CSSProperties> => ({
     borderRadius: '12px',
   },
 
-  // Footer
-  footer: {
-    padding: isMobile ? '60px 0 40px' : '100px 0 40px',
-    background: '#ffffff',
-    borderTop: '1px solid #e2e8f0',
-  },
-  footerContent: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    flexDirection: isMobile ? 'column' as const : 'row' as const,
-    gap: '48px',
-  },
-  footerBrand: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '20px',
-  },
-  footerBrandRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-  },
-  footerLinks: {
-    display: 'flex',
-    gap: '32px',
-    alignItems: 'center',
-    flexDirection: isMobile ? 'column' as const : 'row' as const,
-  },
-  iconLink: {
-    color: '#64748b',
-    fontSize: '1.1rem',
-    transition: 'color 0.2s',
-    textDecoration: 'none',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    fontWeight: 500,
-  },
-  footerNote: {
-    marginTop: '60px',
-    paddingTop: '32px',
-    borderTop: '1px solid #f1f5f9',
-    textAlign: 'center' as const,
-    color: '#94a3b8',
-    fontSize: '0.95rem',
-    fontWeight: 500,
-  }
 });
 
 export default LandingPage;
