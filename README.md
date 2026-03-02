@@ -112,7 +112,3 @@ Dad Circles uses a modern serverless architecture:
 ## 🤝 Contributing
 
 This project was built for a hackathon. For development guidelines, see `AGENTS.md`.
-
-## 📄 License
-
-MIT
