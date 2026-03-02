@@ -9,7 +9,7 @@ An AI-powered platform that connects new and expecting dads with local peer supp
 Dad Circles addresses the isolation many new fathers face by creating local peer support groups. The platform uses a conversational AI interface powered by Google Gemini to guide dads through onboarding, collecting information about their children, interests, and location in a natural, engaging way. Once onboarded, our matching algorithm connects dads with similar profiles in their area to form small, local support circles.
 
 **Key Features:**
-- 🤖 **Conversational Onboarding** - Natural language chat interface powered by Gemini 2.0 Flash
+- 🤖 **Conversational Onboarding** - Natural language chat interface powered by Gemini 3.0 Flash
 - 🎯 **Smart Matching** - Algorithm matches dads based on child age, location, and interests
 - 📧 **Automated Engagement** - Email flows for abandoned sessions, group introductions, and follow-ups
 - 👥 **Group Management** - Admin dashboard for reviewing and approving matched groups
