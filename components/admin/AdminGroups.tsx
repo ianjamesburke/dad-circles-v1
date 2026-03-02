@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { database } from '../../database';
 import { Group, UserProfile } from '../../types';
@@ -24,6 +24,7 @@ interface EnrichedUser {
   child_count?: number;
   area_key?: string | null;
   area_label?: string | null;
+  postcode?: string;
 }
 
 interface AreaOption {
@@ -56,6 +57,12 @@ export const AdminGroups: React.FC = () => {
   const [selectedLifeStage, setSelectedLifeStage] = useState<string>('all');
   const [areas, setAreas] = useState<AreaOption[]>([]);
   const [matchableCounts, setMatchableCounts] = useState<{ unmatchedCount: number; filteredCount: number } | null>(null);
+  
+  // New filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [availableInterests, setAvailableInterests] = useState<string[]>([]);
 
   useEffect(() => {
     loadGroups();
@@ -90,12 +97,26 @@ export const AdminGroups: React.FC = () => {
         areaKey: selectedArea !== 'all' ? selectedArea : undefined,
         lifeStage: selectedLifeStage !== 'all' ? selectedLifeStage : undefined,
       });
-      setUsers(result.users || []);
+      const loadedUsers = result.users || [];
+      setUsers(loadedUsers);
       setAreas(result.areas || []);
       setMatchableCounts({
         unmatchedCount: result.unmatchedCount || 0,
         filteredCount: result.filteredCount || 0,
       });
+      
+      // Extract unique interests from loaded users
+      const interestsSet = new Set<string>();
+      loadedUsers.forEach((user: EnrichedUser) => {
+        if (user.interests && Array.isArray(user.interests)) {
+          user.interests.forEach((interest: string) => {
+            if (interest && typeof interest === 'string') {
+              interestsSet.add(interest.trim());
+            }
+          });
+        }
+      });
+      setAvailableInterests(Array.from(interestsSet).sort());
     } catch (error) {
       setError(`Failed to load users: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -108,6 +129,45 @@ export const AdminGroups: React.FC = () => {
 
   const getGroupMembers = (group: Group): UserProfile[] => {
     return profiles.filter(p => group.member_ids.includes(p.session_id));
+  };
+
+  // Filter users based on search query and selected interests
+  const filteredUsers = useMemo(() => {
+    if (!searchQuery.trim() && selectedInterests.length === 0) {
+      return users;
+    }
+
+    const query = searchQuery.toLowerCase().trim();
+    return users.filter(user => {
+      // Search filter
+      const matchesSearch = !query || 
+        (user.name && user.name.toLowerCase().includes(query)) ||
+        (user.email && user.email.toLowerCase().includes(query)) ||
+        (user.location?.city && user.location.city.toLowerCase().includes(query)) ||
+        (user.postcode && user.postcode.toLowerCase().includes(query)) ||
+        (user.area_label && user.area_label.toLowerCase().includes(query));
+
+      // Interests filter
+      const matchesInterests = selectedInterests.length === 0 || 
+        selectedInterests.every(interest => 
+          user.interests && user.interests.includes(interest)
+        );
+
+      return matchesSearch && matchesInterests;
+    });
+  }, [users, searchQuery, selectedInterests]);
+
+  const toggleInterest = (interest: string) => {
+    setSelectedInterests(prev => 
+      prev.includes(interest) 
+        ? prev.filter(i => i !== interest)
+        : [...prev, interest]
+    );
+  };
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setSelectedInterests([]);
   };
 
   const handleDelete = async (groupId: string) => {
@@ -130,8 +190,6 @@ export const AdminGroups: React.FC = () => {
   };
 
   // Create group functions
-  const filteredUsers = users;
-
   const toggleUser = (userId: string) => {
     const newSelected = new Set(selectedUserIds);
     if (newSelected.has(userId)) {
@@ -425,55 +483,193 @@ export const AdminGroups: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main content - User selection */}
           <div className="lg:col-span-2 space-y-4">
-            {/* Area + life stage filters */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-400 text-sm mb-2 block">Area</label>
-                  <select
-                    value={selectedArea}
-                    onChange={(e) => {
-                      setSelectedArea(e.target.value);
-                      setSelectedUserIds(new Set());
-                      setGroupScore(null);
-                    }}
-                    className="bg-slate-800 text-white px-4 py-2 rounded-lg border border-slate-700 focus:border-blue-500 focus:outline-none w-full"
-                  >
-                    <option value="all">Select an area ({areas.length} areas)</option>
-                    {areas.map(area => (
-                      <option key={area.key} value={area.key}>
-                        {area.label} ({area.count} users)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-slate-400 text-sm mb-2 block">Life Stage</label>
-                  <select
-                    value={selectedLifeStage}
-                    onChange={(e) => {
-                      setSelectedLifeStage(e.target.value);
-                      setSelectedUserIds(new Set());
-                      setGroupScore(null);
-                    }}
-                    className="bg-slate-800 text-white px-4 py-2 rounded-lg border border-slate-700 focus:border-blue-500 focus:outline-none w-full"
-                  >
-                    <option value="all">All life stages</option>
-                    <option value="Expecting">Expecting</option>
-                    <option value="Newborn">Newborn</option>
-                    <option value="Infant">Infant</option>
-                    <option value="Toddler">Toddler</option>
-                  </select>
+            {/* Search bar and filter controls */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
+              {/* Search bar */}
+              <div>
+                <div className="relative">
+                  <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500"></i>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by name, email, city, postcode..."
+                    className="w-full bg-slate-800 text-white pl-10 pr-4 py-2 rounded-lg border border-slate-700 focus:border-blue-500 focus:outline-none"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-white"
+                    >
+                      <i className="fas fa-times"></i>
+                    </button>
+                  )}
                 </div>
               </div>
+
+              {/* Quick filters */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-slate-400 text-sm">Quick filters</span>
+                  <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className="text-slate-500 hover:text-white text-sm flex items-center gap-1"
+                  >
+                    <i className={`fas fa-chevron-${showFilters ? 'up' : 'down'} text-xs`}></i>
+                    {showFilters ? 'Hide filters' : 'Show filters'}
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {/* Life stage quick filters */}
+                  {['Expecting', 'Newborn', 'Infant', 'Toddler'].map(stage => (
+                    <button
+                      key={stage}
+                      onClick={() => {
+                        setSelectedLifeStage(selectedLifeStage === stage ? 'all' : stage);
+                        setSelectedUserIds(new Set());
+                        setGroupScore(null);
+                      }}
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
+                        selectedLifeStage === stage
+                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                          : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+                      }`}
+                    >
+                      {stage}
+                    </button>
+                  ))}
+                  {/* Popular area quick filters */}
+                  {areas.slice(0, 3).map(area => (
+                    <button
+                      key={area.key}
+                      onClick={() => {
+                        setSelectedArea(selectedArea === area.key ? 'all' : area.key);
+                        setSelectedUserIds(new Set());
+                        setGroupScore(null);
+                      }}
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
+                        selectedArea === area.key
+                          ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                          : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+                      }`}
+                    >
+                      {area.label} ({area.count})
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Collapsible filter panel */}
+              {showFilters && (
+                <div className="border-t border-slate-800 pt-4 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Area filter */}
+                    <div>
+                      <label className="text-slate-400 text-sm mb-2 block">Area</label>
+                      <select
+                        value={selectedArea}
+                        onChange={(e) => {
+                          setSelectedArea(e.target.value);
+                          setSelectedUserIds(new Set());
+                          setGroupScore(null);
+                        }}
+                        className="bg-slate-800 text-white px-4 py-2 rounded-lg border border-slate-700 focus:border-blue-500 focus:outline-none w-full"
+                      >
+                        <option value="all">All areas ({areas.length} areas)</option>
+                        {areas.map(area => (
+                          <option key={area.key} value={area.key}>
+                            {area.label} ({area.count} users)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {/* Life stage filter */}
+                    <div>
+                      <label className="text-slate-400 text-sm mb-2 block">Life Stage</label>
+                      <select
+                        value={selectedLifeStage}
+                        onChange={(e) => {
+                          setSelectedLifeStage(e.target.value);
+                          setSelectedUserIds(new Set());
+                          setGroupScore(null);
+                        }}
+                        className="bg-slate-800 text-white px-4 py-2 rounded-lg border border-slate-700 focus:border-blue-500 focus:outline-none w-full"
+                      >
+                        <option value="all">All life stages</option>
+                        <option value="Expecting">Expecting</option>
+                        <option value="Newborn">Newborn</option>
+                        <option value="Infant">Infant</option>
+                        <option value="Toddler">Toddler</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Interests filter */}
+                  {availableInterests.length > 0 && (
+                    <div>
+                      <label className="text-slate-400 text-sm mb-2 block">Interests</label>
+                      <div className="flex flex-wrap gap-2">
+                        {availableInterests.slice(0, 10).map(interest => (
+                          <button
+                            key={interest}
+                            onClick={() => toggleInterest(interest)}
+                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
+                              selectedInterests.includes(interest)
+                                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                                : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+                            }`}
+                          >
+                            {interest}
+                            {selectedInterests.includes(interest) && (
+                              <i className="fas fa-check ml-1.5"></i>
+                            )}
+                          </button>
+                        ))}
+                        {availableInterests.length > 10 && (
+                          <span className="text-slate-500 text-sm px-3 py-1.5">
+                            +{availableInterests.length - 10} more
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Active filters and clear button */}
+                  {(selectedArea !== 'all' || selectedLifeStage !== 'all' || selectedInterests.length > 0 || searchQuery) && (
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                      <div className="text-slate-400 text-sm">
+                        Active filters: 
+                        {selectedArea !== 'all' && ` Area: ${areas.find(a => a.key === selectedArea)?.label || selectedArea}`}
+                        {selectedLifeStage !== 'all' && ` • Life stage: ${selectedLifeStage}`}
+                        {selectedInterests.length > 0 && ` • Interests: ${selectedInterests.length}`}
+                        {searchQuery && ` • Search: "${searchQuery}"`}
+                      </div>
+                      <button
+                        onClick={clearFilters}
+                        className="text-slate-500 hover:text-white text-sm flex items-center gap-1"
+                      >
+                        <i className="fas fa-times"></i>
+                        Clear all
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Stats */}
               {matchableCounts && (
-                <p className="mt-3 text-xs text-slate-500">
-                  Unmatched pool: {matchableCounts.unmatchedCount}
-                  {selectedArea !== 'all' && ` • Candidates shown: ${matchableCounts.filteredCount}`}
-                </p>
+                <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-800">
+                  <span>Unmatched pool: {matchableCounts.unmatchedCount}</span>
+                  {selectedArea !== 'all' && (
+                    <span>Candidates shown: {filteredUsers.length} of {matchableCounts.filteredCount}</span>
+                  )}
+                  {searchQuery && (
+                    <span>Search results: {filteredUsers.length}</span>
+                  )}
+                </div>
               )}
               {error && (
-                <div className="mt-3 bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg text-sm">
+                <div className="mt-2 bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg text-sm">
                   {error}
                 </div>
               )}
@@ -501,7 +697,7 @@ export const AdminGroups: React.FC = () => {
                 </div>
                 <p className="text-slate-500 mb-2">No candidates found for this filter</p>
                 <p className="text-slate-600 text-sm">
-                  Try another area or life stage, or generate test users in Admin Tools
+                  Try another area, life stage, or clear your search filters
                 </p>
               </div>
             ) : (
