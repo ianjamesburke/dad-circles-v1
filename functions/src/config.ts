@@ -10,7 +10,7 @@ export const CONFIG = {
    * Gemini API configuration
    */
   gemini: {
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-3.1-flash-preview',
     timeout: 30,
     maxOutputTokens: 1024,
     temperature: 0.4,
@@ -21,9 +21,9 @@ export const CONFIG = {
    * Weekend Mission generator configuration
    */
   mission: {
-    researchModels: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3-flash-preview', 'gemini-3-pro-preview'] as const,
-    reasoningModels: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-3-pro-preview', 'gemini-3-flash-preview'] as const,
-    internalModels: ['gemini-3-flash-preview', 'gemini-2.5-flash'] as const,
+    researchModels: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3.1-flash-preview', 'gemini-3.1-pro-preview'] as const,
+    reasoningModels: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-preview'] as const,
+    internalModels: ['gemini-3.1-flash-preview', 'gemini-2.5-flash'] as const,
     useInternalResearchDocument: process.env.MISSION_USE_INTERNAL_RESEARCH !== 'false',
     internalResearchDocumentPath: process.env.MISSION_INTERNAL_RESEARCH_DOC_PATH || 'research/ann-arbor.md',
     internalIdeaCount: 6,
