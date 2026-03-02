@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { database } from '../../database';
 import { UserProfile } from '../../types';
 import { formatLocationDisplay } from '../../utils/location';
-import { formatChildInfo } from '../../utils/childDisplay';
+import { formatChildrenSummary } from '../../utils/childDisplay';
 
 type FilterStatus = 'all' | 'onboarded' | 'in_progress' | 'matched' | 'unmatched';
 
@@ -95,8 +95,7 @@ export const AdminUsers: React.FC = () => {
   };
 
   const getChildInfo = (profile: UserProfile) => {
-    if (!profile.children || profile.children.length === 0) return 'No children info';
-    return formatChildInfo(profile.children[0]);
+    return formatChildrenSummary(profile.children);
   };
 
   const handleDeleteUser = async (profile: UserProfile, e?: React.MouseEvent) => {

@@ -14,6 +14,9 @@ import {
     generateWeekendMission,
     createWeekendMissionJob,
     getWeekendMissionJob,
+    getMatchableUsers,
+    calculateMatchabilityScore,
+    createManualGroup,
 } from '@/services/callableService';
 import {
     getProfile,
@@ -110,6 +113,9 @@ export const database = {
     generateWeekendMission,
     createWeekendMissionJob,
     getWeekendMissionJob,
+    getMatchableUsers,
+    calculateMatchabilityScore,
+    createManualGroup,
 };
 
 export { getLifeStageFromUser };

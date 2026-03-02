@@ -23,6 +23,10 @@ dist-ssr
 .env.test.local
 .env.production.local
 
+# Firebase service account keys
+serviceAccount.json
+*-firebase-adminsdk-*.json
+
 # Local development scripts (contain API keys)
 dev-local.bat
 dev-local.ps1
@@ -68,3 +72,4 @@ vite-dev.log
 
 /internal-docs/*
 
+creds/*

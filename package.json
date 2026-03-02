@@ -24,7 +24,9 @@
     "deploy": "npm run build && firebase deploy",
     "deploy:hosting": "npm run build && firebase deploy --only hosting",
     "deploy:preview": "npm run build && firebase hosting:channel:deploy preview",
-    "deploy:live": "npm run build && firebase deploy --only hosting,functions"
+    "deploy:live": "npm run build && firebase deploy --only hosting,functions",
+    "export-users": "tsx scripts/exportUsersToCSV.ts",
+    "backfill-segment": "tsx scripts/backfillResendSegment.ts"
   },
   "dependencies": {
     "@google/genai": "^1.38.0",

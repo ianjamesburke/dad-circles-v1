@@ -64,3 +64,13 @@ export function formatChildInfoWithGender(child: Child): string {
   }
   return baseInfo;
 }
+
+/**
+ * Compact child summary for admin tables/cards.
+ * Uses the first child as the matching/display anchor and indicates extra children.
+ */
+export function formatChildrenSummary(children?: Child[] | null): string {
+  if (!children || children.length === 0) return 'No children info';
+  const base = formatChildInfo(children[0]);
+  return children.length > 1 ? `${base} (+${children.length - 1} more)` : base;
+}

@@ -35,6 +35,7 @@ interface UserProfile {
     siblings?: Child[];
     last_updated: number;
     matching_eligible: boolean;
+    group_id?: string | null;
 }
 
 const firebaseConfig = {
@@ -85,6 +86,7 @@ const seedAdmin = async () => {
             siblings: [],
             last_updated: Date.now(),
             matching_eligible: true,
+            group_id: null,
         };
 
         const ref = doc(db, 'profiles', profile.session_id);

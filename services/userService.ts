@@ -36,6 +36,7 @@ export const createProfile = async (sessionId: string, email?: string, postcode?
     onboarding_step: OnboardingStep.WELCOME,
     children: [],
     children_complete: false,
+    group_id: null,
     last_updated: serverTimestamp() as any,
     matching_eligible: false, // Default to false until onboarding is complete
   };
@@ -72,7 +73,7 @@ export const getUsersInGroup = async (groupId: string): Promise<UserProfile[]> =
 export const updateUserGroupAssignment = async (sessionId: string, groupId: string | null): Promise<void> => {
     const ref = doc(profilesCol, sessionId);
     const updates: Partial<UserProfile> = {
-      group_id: groupId ?? undefined,
+      group_id: groupId ?? null,
       last_updated: serverTimestamp() as any,
     };
 

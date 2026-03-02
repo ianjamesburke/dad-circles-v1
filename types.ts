@@ -49,7 +49,7 @@ export interface UserProfile {
   utm?: UtmParams;
 
   // Matching fields
-  group_id?: string; // Reference to assigned group
+  group_id?: string | null; // Reference to assigned group (null when unmatched)
   matched_at?: any; // Firestore Timestamp
   matching_eligible: boolean; // True if onboarded with valid location and child data
 
@@ -127,13 +127,14 @@ export interface Group {
   name: string;
   created_at: any; // Firestore Timestamp (server-side) or number (legacy)
   location: UserLocation;
-  member_ids: string[]; // Array of session_ids (4-6 members)
+  member_ids: string[]; // Array of session_ids (1-6 members)
   member_emails: string[]; // Array of member emails
-  status: 'pending' | 'active' | 'inactive';
+  status: 'pending' | 'active' | 'inactive' | 'deleted'; // Legacy values may still exist in Firestore
   emailed_member_ids: string[]; // Array of session_ids who successfully received the email
   introduction_email_sent_at?: any; // Firestore Timestamp
   test_mode: boolean; // True for test groups
-  life_stage: LifeStage; // The life stage this group represents
+  life_stage: LifeStage | string; // The life stage this group represents
+  matchability_score?: number; // 0-100 score for group cohesion
 }
 
 export interface MatchingStats {

@@ -27,7 +27,20 @@ export const defaultFromEmail = defineSecret("DEFAULT_FROM_EMAIL");
 export const sendRealEmails = defineSecret("SEND_REAL_EMAILS");
 
 // Export Callable Functions for Admin Dashboard
-export { runMatching, seedData, approveGroup, deleteGroup, sendMagicLink, sendCompletionEmail, sendManualAbandonmentEmail, startSession, redeemMagicLink } from "./callable";
+export {
+  runMatching,
+  seedData,
+  approveGroup,
+  deleteGroup,
+  sendMagicLink,
+  sendCompletionEmail,
+  sendManualAbandonmentEmail,
+  startSession,
+  redeemMagicLink,
+  getMatchableUsers,
+  calculateMatchabilityScore,
+  createManualGroup,
+} from "./callable";
 
 // Export Gemini AI Function
 export { getGeminiResponse } from "./gemini/index";

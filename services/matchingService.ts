@@ -15,21 +15,17 @@ export const getUnmatchedUsers = async (
   stateCode?: string,
   countryCode?: string
 ): Promise<UserProfile[]> => {
-  let q = query(profilesCol, where('matching_eligible', '==', true), where('group_id', '==', null));
-
-  if (city && stateCode) {
-    q = query(
-      profilesCol,
-      where('matching_eligible', '==', true),
-      where('group_id', '==', null),
-      where('location.city', '==', city),
-      where('location.state_code', '==', stateCode),
-      ...(countryCode ? [where('location.country_code', '==', countryCode)] : [])
-    );
-  }
-
+  const q = query(profilesCol, where('matching_eligible', '==', true));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => doc.data() as UserProfile);
+
+  return snapshot.docs
+    .map(doc => doc.data() as UserProfile)
+    .filter(profile => profile.group_id == null)
+    .filter(profile => !city || !stateCode || (
+      profile.location?.city === city &&
+      profile.location?.state_code === stateCode &&
+      (!countryCode || profile.location?.country_code === countryCode)
+    ));
 };
 
 export const getMatchingStats = async (): Promise<MatchingStats> => {

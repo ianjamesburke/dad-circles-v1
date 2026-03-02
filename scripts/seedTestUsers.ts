@@ -35,6 +35,7 @@ interface UserProfile {
   siblings?: Child[];
   last_updated: number;
   matching_eligible: boolean;
+  group_id?: string | null;
 }
 
 // Firebase config for emulator
@@ -206,6 +207,7 @@ const seedTestUsers = async () => {
         siblings: [],
         last_updated: Date.now(),
         matching_eligible: true, // All test users are eligible for matching
+        group_id: null,
       };
 
       const ref = doc(db, 'profiles', user.sessionId);

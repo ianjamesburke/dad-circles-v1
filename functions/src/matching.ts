@@ -46,11 +46,13 @@ interface Group {
   };
   member_ids: string[];
   member_emails: string[];
-  status: 'pending' | 'active' | 'inactive';
+  // New writes use active/deleted, but legacy documents may still be pending/inactive.
+  status: 'pending' | 'active' | 'inactive' | 'deleted';
   emailed_member_ids: string[];
   introduction_email_sent_at?: any; // Firestore Timestamp
   test_mode: boolean;
   life_stage: string;
+  matchability_score?: number;
 }
 
 enum LifeStage {
@@ -235,9 +237,9 @@ async function formGroupsFromUsers(
       location: location,
       member_ids: chunk.map(u => u.session_id),
       member_emails: chunk.map(u => u.email || '').filter(e => e),
-      status: 'pending',
+      status: 'active', // Active immediately (no pending state)
       emailed_member_ids: [],
-      test_mode: false, // Always false per V1 spec (no test mode distinction)
+      test_mode: false,
       life_stage: lifeStage,
     };
 
@@ -347,18 +349,16 @@ export async function sendGroupIntroductionEmails(
  */
 async function getUnmatchedUsers(city?: string, stateCode?: string): Promise<UserProfile[]> {
   const db = admin.firestore();
-  let query: admin.firestore.Query = db.collection('profiles')
+  const snapshot = await db.collection('profiles')
     .where('matching_eligible', '==', true)
-    .where('group_id', '==', null);
+    .get();
 
-  if (city && stateCode) {
-    query = query
-      .where('location.city', '==', city)
-      .where('location.state_code', '==', stateCode);
-  }
-
-  const snapshot = await query.get();
-  return snapshot.docs.map(doc => doc.data() as UserProfile);
+  return snapshot.docs
+    .map(doc => doc.data() as UserProfile)
+    .filter(user => user.group_id == null)
+    .filter(user => !city || !stateCode || (
+      user.location?.city === city && user.location?.state_code === stateCode
+    ));
 }
 
 /**
@@ -427,8 +427,8 @@ export async function runMatchingAlgorithm(
     if (allGroups.length > 0) {
       await assignUsersToGroups(allGroups);
 
-      // 5. Emails are NOT sent automatically in V1 spec
-      // Groups remain in 'pending' status until manually approved
+      // 5. Emails are NOT sent automatically in this path.
+      // Current group writes are created as active; manual email send/approval remains a separate action.
       /*
       for (const group of allGroups) {
         await sendGroupIntroductionEmails(group, testMode);
@@ -457,7 +457,7 @@ export async function runMatchingAlgorithm(
  */
 export async function runDailyMatching(): Promise<void> {
   try {
-    // Note: Daily matching creates pending groups but does not send emails
+    // Note: Daily matching does not send emails automatically
     await runMatchingAlgorithm(undefined, undefined, false);
     logger.info("🎉 Daily matching job completed");
   } catch (error) {
@@ -467,6 +467,7 @@ export async function runDailyMatching(): Promise<void> {
 
 /**
  * Approve a group and send introduction emails
+ * NOTE: This is now legacy - new flow creates groups as active immediately
  */
 export async function approveAndEmailGroup(groupId: string): Promise<{ success: boolean; message: string }> {
   const db = admin.firestore();
@@ -479,29 +480,26 @@ export async function approveAndEmailGroup(groupId: string): Promise<{ success: 
 
     const group = groupDoc.data() as Group;
 
-    // Validate status
-    if (group.status !== 'pending') {
-      throw new Error(`Group is already ${group.status}, cannot approve again`);
+    if (group.status === 'deleted') {
+      throw new Error("Cannot approve a deleted group");
     }
 
-    // Send emails (using existing service which handles test/prod modes internally via API key)
-    // we pass false for testMode because the concept is removed in V1
+    if (group.status === 'active' && group.introduction_email_sent_at) {
+      throw new Error("Group introduction emails were already sent");
+    }
+
+    // Send emails
     const emailResult = await sendGroupIntroductionEmails(group, false);
 
     if (emailResult.success && emailResult.emailedMembers.length > 0) {
       return { success: true, message: `Emails sent to ${emailResult.emailedMembers.length} members` };
     } else {
-      // No emails were sent - this could be because:
-      // 1. No members have email addresses
-      // 2. Email service failed
-      // We should still approve the group but warn about the email issue
       logger.warn("⚠️ Group approved but no emails sent", { 
         groupId, 
         memberCount: group.member_ids.length,
         emailedCount: emailResult.emailedMembers.length 
       });
       
-      // Manually update group status to active since sendGroupIntroductionEmails didn't
       await db.collection('groups').doc(groupId).update({
         status: 'active',
         introduction_email_sent_at: FieldValue.serverTimestamp(),
@@ -519,7 +517,7 @@ export async function approveAndEmailGroup(groupId: string): Promise<{ success: 
 }
 
 /**
- * Delete a pending group and unmatch its members
+ * Delete a group and unmatch its members (soft delete)
  */
 export async function deleteGroup(groupId: string): Promise<{ success: boolean; message: string }> {
   const db = admin.firestore();
@@ -534,21 +532,21 @@ export async function deleteGroup(groupId: string): Promise<{ success: boolean; 
 
     const group = groupDoc.data() as Group;
 
-    // Safety check: Only delete pending groups
-    if (group.status === 'active') {
-      throw new Error("Cannot delete an active group that has already received emails");
-    }
+    // Soft delete - mark as deleted instead of removing
+    await groupRef.update({
+      status: 'deleted',
+      last_updated: FieldValue.serverTimestamp()
+    });
 
-    // Unmatch all members using batch instead of transaction
+    // Unmatch all members
     const batch = db.batch();
     let updatedCount = 0;
     let missingProfiles: string[] = [];
 
     for (const memberId of group.member_ids) {
       const userRef = db.collection('profiles').doc(memberId);
-
-      // Check if the profile exists before updating
       const userDoc = await userRef.get();
+      
       if (userDoc.exists) {
         batch.update(userRef, {
           group_id: null,
@@ -562,10 +560,6 @@ export async function deleteGroup(groupId: string): Promise<{ success: boolean; 
       }
     }
 
-    // Delete the group
-    batch.delete(groupRef);
-
-    // Commit the batch
     await batch.commit();
 
     logger.info("✅ Group deleted successfully", {
@@ -577,7 +571,9 @@ export async function deleteGroup(groupId: string): Promise<{ success: boolean; 
 
     return {
       success: true,
-      message: `Group deleted and ${updatedCount} members returned to pool${missingProfiles.length > 0 ? ` (${missingProfiles.length} profiles not found)` : ''}`
+      message: `Group deleted and ${updatedCount} members returned to pool${
+        missingProfiles.length > 0 ? ` (${missingProfiles.length} profiles not found)` : ''
+      }`
     };
   } catch (error) {
     logger.error("❌ Error deleting group", { groupId, error });
@@ -591,6 +587,17 @@ export async function deleteGroup(groupId: string): Promise<{ success: boolean; 
  */
 export async function seedTestData(): Promise<void> {
   const db = admin.firestore();
+  const cityZip3ByName: Record<string, string> = {
+    'Ann Arbor': '481',
+    'Austin': '787',
+    'Boulder': '803',
+    'Portland': '972',
+    'Seattle': '981',
+    'Denver': '802',
+    'Nashville': '372',
+    'Phoenix': '850',
+    'Miami': '331',
+  };
 
   // Helper to generate realistic test data
   const generateTestUsers = () => {
@@ -729,10 +736,16 @@ export async function seedTestData(): Promise<void> {
       last_updated: FieldValue.serverTimestamp()
     };
 
+    const zip3 = cityZip3ByName[user.location.city] || '999';
+    const sessionDigits = user.sessionId.replace(/\D/g, '');
+    const zipTail = (sessionDigits.slice(-2) || '00').padStart(2, '0').slice(-2);
+    const postcode = `${zip3}${zipTail}`;
+
     // We can't strictly type-check 'interests' vs UserProfile 
     // if UserProfile doesn't have it, but we can save it to Firestore anyway.
     const dataToSave = {
       ...profile,
+      postcode,
       interests: user.interests || [],
       siblings: []
     };

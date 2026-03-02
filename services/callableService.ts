@@ -113,6 +113,39 @@ export const sendManualAbandonmentEmail = async (sessionId: string): Promise<any
   }
 };
 
+export const getMatchableUsers = async (params?: {
+  areaKey?: string;
+  lifeStage?: string;
+}): Promise<any> => {
+  try {
+    const getMatchableUsersFn = httpsCallable(functions, 'getMatchableUsers');
+    const result = await getMatchableUsersFn(params || {});
+    return result.data;
+  } catch (error) {
+    handleCallableError(error, 'getMatchableUsers');
+  }
+};
+
+export const calculateMatchabilityScore = async (userIds: string[]): Promise<any> => {
+  try {
+    const calculateScoreFn = httpsCallable(functions, 'calculateMatchabilityScore');
+    const result = await calculateScoreFn({ userIds });
+    return result.data;
+  } catch (error) {
+    handleCallableError(error, 'calculateMatchabilityScore');
+  }
+};
+
+export const createManualGroup = async (memberIds: string[], groupName?: string): Promise<any> => {
+  try {
+    const createGroupFn = httpsCallable(functions, 'createManualGroup');
+    const result = await createGroupFn({ memberIds, groupName });
+    return result.data;
+  } catch (error) {
+    handleCallableError(error, 'createManualGroup');
+  }
+};
+
 export const generateWeekendMission = async (
   payload: WeekendMissionRequest
 ): Promise<WeekendMissionResponse> => {

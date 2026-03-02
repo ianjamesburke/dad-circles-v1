@@ -29,6 +29,28 @@
       ]
     },
     {
+      "collectionGroup": "profiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "matching_eligible",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "group_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "location.city",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "location.state_code",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "leads",
       "queryScope": "COLLECTION",
       "fields": [

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { VersionDisplay } from './VersionDisplay';
+import type { CSSProperties } from 'react';
 
 const getStyles = (isMobile: boolean) => ({
   footer: {
@@ -11,7 +12,7 @@ const getStyles = (isMobile: boolean) => ({
   container: {
     maxWidth: '1200px',
     margin: '0 auto' as const,
-    padding: (isMobile ? '0 20px' : '0 32px') as const,
+    padding: isMobile ? '0 20px' : '0 32px',
     width: '100%' as const,
     boxSizing: 'border-box' as const,
   },
@@ -19,7 +20,7 @@ const getStyles = (isMobile: boolean) => ({
     display: 'flex' as const,
     justifyContent: 'space-between' as const,
     alignItems: 'flex-start' as const,
-    flexDirection: (isMobile ? 'column' : 'row') as const,
+    flexDirection: (isMobile ? 'column' : 'row') as CSSProperties['flexDirection'],
     gap: '48px',
   },
   footerBrand: {
@@ -36,7 +37,7 @@ const getStyles = (isMobile: boolean) => ({
     display: 'flex' as const,
     gap: '32px',
     alignItems: 'center' as const,
-    flexDirection: (isMobile ? 'column' : 'row') as const,
+    flexDirection: (isMobile ? 'column' : 'row') as CSSProperties['flexDirection'],
   },
   iconLink: {
     color: '#64748b',

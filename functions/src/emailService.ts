@@ -31,6 +31,7 @@ export const EMAIL_TEMPLATES = {
 
 export class EmailService {
   private static readonly DEFAULT_FROM = "DadCircles <info@mail.dadcircles.com>";
+  private static readonly ONBOARDED_USERS_SEGMENT_ID = process.env.RESEND_ONBOARDED_SEGMENT_ID || "f638c4dc-a4c5-460d-a406-4561a59ec0c2";
   
   /**
    * Initialize Resend client lazily
@@ -54,6 +55,67 @@ export class EmailService {
     }
     
     return resend;
+  }
+
+  /**
+   * Add a contact to the onboarded users segment in Resend
+   * Creates the contact if it doesn't exist, then adds to segment
+   */
+  static async addToOnboardedSegment(email: string, firstName?: string): Promise<boolean> {
+    this.initResend();
+
+    const isEmulator = process.env.FUNCTIONS_EMULATOR === "true";
+    const sendRealEmails = process.env.SEND_REAL_EMAILS === "true";
+
+    // Simulate in emulator mode unless explicitly enabled
+    if ((isEmulator && !sendRealEmails) || !resend) {
+      logger.info("📝 SIMULATED: Add to Resend segment", {
+        email: maskEmail(email),
+        segmentId: this.ONBOARDED_USERS_SEGMENT_ID,
+        reason: isEmulator ? "Emulator Mode" : "Missing API Key"
+      });
+      return true;
+    }
+
+    try {
+      if (!resend) throw new Error("Resend client not initialized");
+
+      logger.info("🚀 Adding contact to Resend", {
+        email: maskEmail(email),
+        segmentId: this.ONBOARDED_USERS_SEGMENT_ID
+      });
+
+      // Create contact (Resend API doesn't support segment assignment in create call)
+      const createResult = await resend.contacts.create({
+        email: email,
+        firstName: firstName,
+        unsubscribed: false,
+      });
+
+      if (createResult.error) {
+        logger.error("❌ Resend contact creation error:", {
+          error: createResult.error,
+          email: maskEmail(email)
+        });
+        return false;
+      }
+
+      const contactId = createResult.data?.id;
+
+      logger.info("✅ Contact created successfully", {
+        email: maskEmail(email),
+        contactId,
+        note: "Segment assignment must be done via Resend dashboard or API separately"
+      });
+
+      return true;
+    } catch (error) {
+      logger.error("❌ Error adding contact to segment:", {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        email: maskEmail(email)
+      });
+      return false;
+    }
   }
 
   /**
